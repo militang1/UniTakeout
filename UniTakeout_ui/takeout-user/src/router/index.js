@@ -3,6 +3,7 @@ import Home from '../views/Home.vue'
 import ShopList from '../views/ShopList.vue'
 import ShopDetail from '../views/ShopDetail.vue'
 import Order from '../views/Order.vue'
+import OrderConfirm from '../views/OrderConfirm.vue'
 import DelegationSquare from '../views/DelegationSquare.vue'
 import AIAgent from '../views/AIAgent.vue'
 import Profile from '../views/Profile.vue'
@@ -27,6 +28,11 @@ const routes = [
     path: '/order',
     name: 'Order',
     component: Order
+  },
+  {
+    path: '/order/confirm',
+    name: 'OrderConfirm',
+    component: OrderConfirm
   },
   {
     path: '/delegation',

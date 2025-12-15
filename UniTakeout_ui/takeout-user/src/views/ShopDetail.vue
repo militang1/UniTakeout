@@ -155,7 +155,7 @@ function addToCart(product) {
 
 function checkout() {
   showCart.value = false
-  router.push('/order')
+  router.push('/order/confirm')
 }
 </script>
 
