@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nbufe.zfr.UniTakeout_server.mapper.UserMapper">
+    <select id="selectByPhone" resultType="User">
+        SELECT * FROM user WHERE phone = #{phone}
+    </select>
+    
+    <select id="selectById" resultType="User">
+        SELECT * FROM user WHERE id = #{id}
+    </select>
+    
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user (phone, nickname, avatar, address)
+        VALUES (#{phone}, #{nickname}, #{avatar}, #{address})
+    </insert>
+    
+    <update id="update">
+        UPDATE user
+        <set>
+            <if test="nickname != null">nickname = #{nickname},</if>
+            <if test="avatar != null">avatar = #{avatar},</if>
+            <if test="address != null">address = #{address}</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+</mapper>
+

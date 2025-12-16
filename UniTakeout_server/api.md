@@ -275,27 +275,55 @@ Authorization: Bearer {token}
 
 ### 5. 订单相关
 
-#### 5.1 创建订单
+> 本章节与前端 `OrderConfirm.vue` / `Order.vue` 页面字段保持一致，包含收货人姓名、电话、地址、支付方式、金额等信息。
+
+#### 5.1 创建订单（提交订单）
 - **URL**: `/orders`
 - **Method**: `POST`
 - **认证**: 需要
-- **说明**: 创建新订单
+- **说明**: 在确认订单页提交订单，后端生成订单记录
 
 **请求参数**:
 ```json
 {
   "shopId": 1,
+  "shopName": "校园食堂",
+  "contactName": "张三",
+  "contactPhone": "13800138000",
+  "address": "xx校区 3号宿舍楼 201",
+  "payMethod": "wechat",
   "items": [
     {
       "productId": 1,
-      "quantity": 2,
+      "name": "宫保鸡丁",
+      "quantity": 1,
       "price": 18
+    },
+    {
+      "productId": 2,
+      "name": "米饭",
+      "quantity": 2,
+      "price": 2.5
     }
   ],
-  "address": "3号宿舍楼201",
-  "remark": "不要辣"
+  "goodsAmount": 23,      // 商品小计
+  "deliveryFee": 3,       // 配送费（满减后）
+  "totalAmount": 26,      // 订单总金额 = goodsAmount + deliveryFee
+  "remark": "不要辣，多加饭"
 }
 ```
+
+字段说明：
+- **contactName**: 收货人姓名（前端表单 `form.name`）
+- **contactPhone**: 收货人手机号（前端表单 `form.phone`）
+- **address**: 配送地址（前端表单 `form.address`）
+- **payMethod**: 支付方式，枚举：
+  - `wechat`：微信支付
+  - `alipay`：支付宝
+  - `cash`：货到付款
+- **goodsAmount**: 商品总价（前端 `cartStore.totalPrice`）
+- **deliveryFee**: 配送费，当前规则示例：商品金额大于 30 元免配送费，否则 3 元（与前端一致）
+- **totalAmount**: 订单应付金额
 
 **响应示例**:
 ```json
@@ -305,23 +333,62 @@ Authorization: Bearer {token}
   "data": {
     "id": 1001,
     "orderNo": "202401150001",
-    "status": "pending",
-    "total": 36,
-    "createTime": "2024-01-15 12:30:00"
+    "shopId": 1,
+    "shopName": "校园食堂",
+    "status": "pending",            // 见下方状态说明
+    "contactName": "张三",
+    "contactPhone": "13800138000",
+    "address": "xx校区 3号宿舍楼 201",
+    "payMethod": "wechat",
+    "goodsAmount": 23,
+    "deliveryFee": 3,
+    "totalAmount": 26,
+    "items": [
+      {
+        "id": 1,
+        "productId": 1,
+        "name": "宫保鸡丁",
+        "quantity": 1,
+        "price": 18
+      },
+      {
+        "id": 2,
+        "productId": 2,
+        "name": "米饭",
+        "quantity": 2,
+        "price": 2.5
+      }
+    ],
+    "remark": "不要辣，多加饭",
+    "createTime": "2024-01-15 12:30:00",
+    "payTime": null,
+    "deliveryTime": null
   }
 }
 ```
+
+**订单状态（status）枚举建议**：
+- `pending`：待支付/待接单
+- `processing`：进行中（已接单/配送中）
+- `completed`：已完成
+- `cancelled`：已取消
+
+---
 
 #### 5.2 获取订单列表
 - **URL**: `/orders`
 - **Method**: `GET`
 - **认证**: 需要
-- **说明**: 获取当前用户的订单列表
+- **说明**: 获取当前登录用户的订单列表，用于订单列表页 `Order.vue`
 
 **请求参数** (Query):
-- `page`: 页码，默认1
-- `pageSize`: 每页数量，默认10
-- `status`: 订单状态，可选值：`pending`(待支付), `processing`(进行中), `completed`(已完成), `cancelled`(已取消)
+- `page`: 页码，默认 1
+- `pageSize`: 每页数量，默认 10
+- `status`: 订单状态，可选值：
+  - `pending`
+  - `processing`
+  - `completed`
+  - `cancelled`
 
 **响应示例**:
 ```json
@@ -335,13 +402,21 @@ Authorization: Bearer {token}
         "shopId": 1,
         "shopName": "校园食堂",
         "status": "pending",
-        "total": 36,
+        "goodsAmount": 23,
+        "deliveryFee": 3,
+        "totalAmount": 26,
         "items": [
           {
             "id": 1,
             "name": "宫保鸡丁",
-            "quantity": 2,
+            "quantity": 1,
             "price": 18
+          },
+          {
+            "id": 2,
+            "name": "米饭",
+            "quantity": 2,
+            "price": 2.5
           }
         ],
         "createTime": "2024-01-15 12:30:00"
@@ -354,10 +429,13 @@ Authorization: Bearer {token}
 }
 ```
 
+---
+
 #### 5.3 获取订单详情
 - **URL**: `/orders/:id`
 - **Method**: `GET`
 - **认证**: 需要
+- **说明**: 获取指定订单的详细信息，供订单详情页使用（如后续新增）
 
 **响应示例**:
 ```json
@@ -369,17 +447,30 @@ Authorization: Bearer {token}
     "shopId": 1,
     "shopName": "校园食堂",
     "status": "pending",
-    "total": 36,
+    "contactName": "张三",
+    "contactPhone": "13800138000",
+    "address": "xx校区 3号宿舍楼 201",
+    "payMethod": "wechat",
+    "goodsAmount": 23,
+    "deliveryFee": 3,
+    "totalAmount": 26,
     "items": [
       {
         "id": 1,
+        "productId": 1,
         "name": "宫保鸡丁",
-        "quantity": 2,
+        "quantity": 1,
         "price": 18
+      },
+      {
+        "id": 2,
+        "productId": 2,
+        "name": "米饭",
+        "quantity": 2,
+        "price": 2.5
       }
     ],
-    "address": "3号宿舍楼201",
-    "remark": "不要辣",
+    "remark": "不要辣，多加饭",
     "createTime": "2024-01-15 12:30:00",
     "payTime": null,
     "deliveryTime": null
@@ -387,11 +478,20 @@ Authorization: Bearer {token}
 }
 ```
 
+---
+
 #### 5.4 取消订单
 - **URL**: `/orders/:id/cancel`
 - **Method**: `POST`
 - **认证**: 需要
-- **说明**: 取消指定订单（仅待支付状态可取消）
+- **说明**: 取消指定订单（通常仅待支付/待接单状态可取消）
+
+**请求参数**（可选）:
+```json
+{
+  "reason": "临时有事，不需要了"
+}
+```
 
 **响应示例**:
 ```json

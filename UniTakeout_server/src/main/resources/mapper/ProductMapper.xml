@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nbufe.zfr.UniTakeout_server.mapper.ProductMapper">
+    <select id="selectById" resultType="Product">
+        SELECT p.*, c.name as category_name, s.name as shop_name
+        FROM product p
+        LEFT JOIN category c ON p.category_id = c.id
+        LEFT JOIN shop s ON p.shop_id = s.id
+        WHERE p.id = #{id}
+    </select>
+    
+    <select id="selectByShopId" resultType="Product">
+        SELECT p.*, c.name as category_name
+        FROM product p
+        LEFT JOIN category c ON p.category_id = c.id
+        WHERE p.shop_id = #{shopId}
+        <if test="categoryId != null">
+            AND p.category_id = #{categoryId}
+        </if>
+        ORDER BY p.id DESC
+    </select>
+    
+    <select id="selectAll" resultType="Product">
+        SELECT p.*, c.name as category_name, s.name as shop_name
+        FROM product p
+        LEFT JOIN category c ON p.category_id = c.id
+        LEFT JOIN shop s ON p.shop_id = s.id
+        ORDER BY p.id DESC
+    </select>
+</mapper>
+

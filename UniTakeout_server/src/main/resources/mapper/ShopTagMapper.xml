@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nbufe.zfr.UniTakeout_server.mapper.ShopTagMapper">
+    <select id="selectTagsByShopId" resultType="String">
+        SELECT tag FROM shop_tag WHERE shop_id = #{shopId}
+    </select>
+</mapper>
+
