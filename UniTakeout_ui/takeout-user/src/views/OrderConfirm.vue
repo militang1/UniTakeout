@@ -82,29 +82,35 @@
         <span class="label">应付金额</span>
         <span class="value">¥{{ totalAmount.toFixed(2) }}</span>
       </div>
-      <button class="btn btn-primary submit-btn" @click="submitOrder">提交订单</button>
+      <button class="btn btn-primary submit-btn" @click="submitOrder" :disabled="submitting">
+        {{ submitting ? '提交中...' : '提交订单' }}
+      </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '../stores/cart'
 import { useUserStore } from '../stores/user'
+import { orderApi } from '../utils/request'
 
 const router = useRouter()
 const cartStore = useCartStore()
 const userStore = useUserStore()
+const submitting = ref(false)
 
-// TODO: 可以根据路由参数或接口获取真实店铺名称
-const shopName = '校园店铺'
+// 从购物车中获取店铺信息
+const shopId = computed(() => cartStore.shopId)
+const shopName = computed(() => cartStore.shopName || '店铺')
 
 const form = reactive({
   name: userStore.userInfo.nickname || '',
   phone: userStore.userInfo.phone || '',
   address: userStore.userInfo.address || '',
-  payMethod: 'wechat'
+  payMethod: 'wechat',
+  remark: ''
 })
 
 const payMethods = [
@@ -130,6 +136,10 @@ function validate() {
     alert('请输入联系电话')
     return false
   }
+  if (!/^1[3-9]\d{9}$/.test(form.phone.trim())) {
+    alert('请输入正确的手机号')
+    return false
+  }
   if (!form.address.trim()) {
     alert('请输入配送地址')
     return false
@@ -138,20 +148,58 @@ function validate() {
     alert('购物车为空，请先选择商品')
     return false
   }
+  if (!shopId.value) {
+    alert('店铺信息缺失')
+    return false
+  }
   return true
 }
 
-function submitOrder() {
-  if (!validate()) return
+async function submitOrder() {
+  if (!validate() || submitting.value) return
 
-  // 这里可以调用后端创建订单接口，目前先模拟
-  alert('订单提交成功！')
+  try {
+    submitting.value = true
+    
+    // 构建订单数据
+    const orderData = {
+      shopId: shopId.value,
+      shopName: shopName.value,
+      items: cartStore.items.map(item => ({
+        productId: item.id,
+        name: item.name || '',
+        quantity: item.quantity,
+        price: item.price
+      })),
+      contactName: form.name.trim(),
+      contactPhone: form.phone.trim(),
+      address: form.address.trim(),
+      payMethod: form.payMethod,
+      goodsAmount: cartStore.totalPrice,
+      deliveryFee: deliveryFee.value,
+      totalAmount: totalAmount.value,
+      remark: form.remark || ''
+    }
 
-  // 清空购物车
-  cartStore.clearCart()
-
-  // 跳转到订单列表页
-  router.replace('/order')
+    const response = await orderApi.createOrder(orderData)
+    
+    if (response.code === 200) {
+      alert('订单提交成功！')
+      
+      // 清空购物车
+      cartStore.clearCart()
+      
+      // 跳转到订单列表页
+      router.replace('/order')
+    } else {
+      alert(response.message || '订单提交失败')
+    }
+  } catch (error) {
+    console.error('提交订单失败:', error)
+    alert(error.message || '订单提交失败，请稍后重试')
+  } finally {
+    submitting.value = false
+  }
 }
 </script>
 

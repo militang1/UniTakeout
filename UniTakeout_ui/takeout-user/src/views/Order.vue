@@ -17,6 +17,7 @@
     </div>
 
     <div class="order-list">
+      <div v-if="loading" class="loading">加载中...</div>
       <div
         v-for="order in filteredOrders"
         :key="order.id"
@@ -36,7 +37,7 @@
         </div>
         <div class="order-footer">
           <span class="order-time">{{ order.createTime }}</span>
-          <span class="order-total">合计：¥{{ order.total }}</span>
+          <span class="order-total">合计：¥{{ order.totalAmount || order.total }}</span>
         </div>
         <div v-if="order.status === 'pending'" class="order-actions">
           <button class="btn btn-outline" @click.stop="cancelOrder(order.id)">取消订单</button>
@@ -51,9 +52,12 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { orderApi } from '../utils/request'
 
 const activeTab = ref('all')
+const orders = ref([])
+const loading = ref(false)
 
 const orderTabs = [
   { label: '全部', value: 'all' },
@@ -62,48 +66,35 @@ const orderTabs = [
   { label: '已完成', value: 'completed' }
 ]
 
-const orders = ref([
-  {
-    id: 1,
-    shopName: '校园食堂',
-    status: 'pending',
-    createTime: '2024-01-15 12:30',
-    total: 36,
-    items: [
-      { id: 1, name: '宫保鸡丁', quantity: 1, price: 18 },
-      { id: 2, name: '麻婆豆腐', quantity: 1, price: 15 },
-      { id: 3, name: '可乐', quantity: 1, price: 5 }
-    ]
-  },
-  {
-    id: 2,
-    shopName: '咖啡时光',
-    status: 'processing',
-    createTime: '2024-01-15 11:20',
-    total: 25,
-    items: [
-      { id: 4, name: '拿铁', quantity: 1, price: 20 },
-      { id: 5, name: '蛋糕', quantity: 1, price: 5 }
-    ]
-  },
-  {
-    id: 3,
-    shopName: '麻辣香锅',
-    status: 'completed',
-    createTime: '2024-01-14 18:45',
-    total: 45,
-    items: [
-      { id: 6, name: '麻辣香锅', quantity: 1, price: 35 },
-      { id: 7, name: '米饭', quantity: 2, price: 5 }
-    ]
+onMounted(() => {
+  loadOrders()
+})
+
+watch(activeTab, () => {
+  loadOrders()
+})
+
+async function loadOrders() {
+  try {
+    loading.value = true
+    const params = {}
+    if (activeTab.value !== 'all') {
+      params.status = activeTab.value
+    }
+    const response = await orderApi.getOrderList(params)
+    if (response.code === 200 && response.data) {
+      orders.value = response.data.list || []
+    }
+  } catch (error) {
+    console.error('加载订单列表失败:', error)
+    alert(error.message || '加载失败，请稍后重试')
+  } finally {
+    loading.value = false
   }
-])
+}
 
 const filteredOrders = computed(() => {
-  if (activeTab.value === 'all') {
-    return orders.value
-  }
-  return orders.value.filter(order => order.status === activeTab.value)
+  return orders.value
 })
 
 function getStatusText(status) {
@@ -116,10 +107,23 @@ function getStatusText(status) {
   return statusMap[status] || status
 }
 
-function cancelOrder(orderId) {
-  const order = orders.value.find(o => o.id === orderId)
-  if (order) {
-    order.status = 'cancelled'
+async function cancelOrder(orderId) {
+  if (!confirm('确定要取消这个订单吗？')) {
+    return
+  }
+  
+  try {
+    const response = await orderApi.cancelOrder(orderId)
+    if (response.code === 200) {
+      alert('订单已取消')
+      // 重新加载订单列表
+      await loadOrders()
+    } else {
+      alert(response.message || '取消失败')
+    }
+  } catch (error) {
+    console.error('取消订单失败:', error)
+    alert(error.message || '取消失败，请稍后重试')
   }
 }
 </script>
@@ -262,6 +266,12 @@ function cancelOrder(orderId) {
 .empty {
   text-align: center;
   padding: 60px 0;
+  color: var(--text-light);
+}
+
+.loading {
+  text-align: center;
+  padding: 40px 0;
   color: var(--text-light);
 }
 </style>

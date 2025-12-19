@@ -33,6 +33,7 @@ export const aiApi = {
 export const userApi = {
   login: (data) => api.post('/auth/login', data),
   register: (data) => api.post('/auth/register', data),
+  sendCode: (data) => api.post('/auth/send-code', data),
   getUserInfo: () => api.get('/user/info'),
   updateUserInfo: (data) => api.put('/user/info', data)
 }

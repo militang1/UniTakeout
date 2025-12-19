@@ -28,6 +28,7 @@
     </div>
 
     <div class="product-list">
+      <div v-if="loading" class="loading">加载中...</div>
       <div
         v-for="product in filteredProducts"
         :key="product.id"
@@ -80,77 +81,98 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCartStore } from '../stores/cart'
+import { shopApi } from '../utils/request'
 
 const route = useRoute()
 const router = useRouter()
 const cartStore = useCartStore()
 const showCart = ref(false)
-const activeCategory = ref(1)
+const activeCategory = ref(0) // 0表示全部
+const loading = ref(false)
 
 const shop = ref({
-  id: 1,
-  name: '校园食堂',
-  description: '营养丰富，价格实惠，学生首选',
-  image: 'https://via.placeholder.com/400x200',
-  rating: 4.8,
-  monthlySales: 1200,
-  deliveryTime: 20
+  id: null,
+  name: '',
+  description: '',
+  image: '',
+  rating: 0,
+  monthlySales: 0,
+  deliveryTime: 0
 })
 
 const categories = ref([
-  { id: 1, name: '全部' },
-  { id: 2, name: '主食' },
-  { id: 3, name: '小食' },
-  { id: 4, name: '饮品' }
+  { id: 0, name: '全部' }
 ])
 
-const products = ref([
-  {
-    id: 1,
-    name: '宫保鸡丁',
-    description: '鸡肉鲜嫩，花生酥脆',
-    price: 18,
-    image: 'https://via.placeholder.com/100',
-    categoryId: 2
-  },
-  {
-    id: 2,
-    name: '麻婆豆腐',
-    description: '麻辣鲜香，下饭神器',
-    price: 15,
-    image: 'https://via.placeholder.com/100',
-    categoryId: 2
-  },
-  {
-    id: 3,
-    name: '炸鸡块',
-    description: '外酥里嫩，香脆可口',
-    price: 12,
-    image: 'https://via.placeholder.com/100',
-    categoryId: 3
-  },
-  {
-    id: 4,
-    name: '可乐',
-    description: '冰镇可乐，清爽解腻',
-    price: 5,
-    image: 'https://via.placeholder.com/100',
-    categoryId: 4
-  }
-])
+const products = ref([])
+const allProducts = ref([]) // 保存所有商品，用于分类筛选
 
 const filteredProducts = computed(() => {
-  if (activeCategory.value === 1) {
-    return products.value
+  if (activeCategory.value === 0) {
+    return allProducts.value
   }
-  return products.value.filter(p => p.categoryId === activeCategory.value)
+  return allProducts.value.filter(p => p.categoryId === activeCategory.value)
 })
 
+onMounted(async () => {
+  const shopId = route.params.id
+  if (shopId) {
+    await loadShopDetail(shopId)
+    await loadProducts(shopId)
+  }
+})
+
+async function loadShopDetail(shopId) {
+  try {
+    loading.value = true
+    const response = await shopApi.getShopDetail(shopId)
+    if (response.code === 200 && response.data) {
+      shop.value = response.data
+    }
+  } catch (error) {
+    console.error('加载店铺详情失败:', error)
+    alert(error.message || '加载失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function loadProducts(shopId) {
+  try {
+    const response = await shopApi.getShopProducts(shopId)
+    if (response.code === 200 && response.data) {
+      allProducts.value = response.data || []
+      
+      // 根据商品列表生成分类
+      const categoryMap = new Map()
+      allProducts.value.forEach(product => {
+        if (product.categoryId && product.categoryName) {
+          if (!categoryMap.has(product.categoryId)) {
+            categoryMap.set(product.categoryId, {
+              id: product.categoryId,
+              name: product.categoryName
+            })
+          }
+        }
+      })
+      
+      // 更新分类列表：全部 + 实际分类
+      categories.value = [
+        { id: 0, name: '全部' },
+        ...Array.from(categoryMap.values())
+      ]
+    }
+  } catch (error) {
+    console.error('加载商品列表失败:', error)
+    alert(error.message || '加载商品失败，请稍后重试')
+  }
+}
+
 function addToCart(product) {
-  cartStore.addItem(product)
+  cartStore.addItem(product, shop.value.id, shop.value.name)
 }
 
 function checkout() {
@@ -432,6 +454,12 @@ function checkout() {
 .item-controls span {
   min-width: 24px;
   text-align: center;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--text-light);
 }
 </style>
 

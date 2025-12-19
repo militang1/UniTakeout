@@ -2,7 +2,7 @@ package com.nbufe.zfr.UniTakeout_server.common;
 
 public class Constants {
     // JWT密钥
-    public static final String JWT_SECRET = "UniTakeoutSecretKey2024";
+    public static final String JWT_SECRET = "UniTakeoutSecretKey2024_UniTakeoutSecretKey";
     // JWT过期时间（7天）
     public static final long JWT_EXPIRATION = 7 * 24 * 60 * 60 * 1000L;
     

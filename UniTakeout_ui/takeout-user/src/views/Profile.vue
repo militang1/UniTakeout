@@ -71,7 +71,9 @@
             <label>验证码</label>
             <div class="code-input">
               <input v-model="loginForm.code" type="text" placeholder="请输入验证码" />
-              <button class="btn btn-outline" @click="sendCode">发送验证码</button>
+              <button class="btn btn-outline" @click="sendCode" :disabled="sendingCode">
+                {{ sendingCode ? '发送中...' : '发送验证码' }}
+              </button>
             </div>
           </div>
         </div>
@@ -85,11 +87,13 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useUserStore } from '../stores/user'
+import { userApi } from '../utils/request'
 
 const userStore = useUserStore()
 const showLogin = ref(false)
+const sendingCode = ref(false)
 
 const userInfo = ref({
   nickname: userStore.userInfo.nickname || '用户',
@@ -103,6 +107,33 @@ const loginForm = ref({
   code: ''
 })
 
+onMounted(async () => {
+  // 如果已登录，获取用户信息
+  if (userStore.isLoggedIn) {
+    await loadUserInfo()
+  }
+})
+
+async function loadUserInfo() {
+  try {
+    const response = await userApi.getUserInfo()
+    if (response.code === 200 && response.data) {
+      userStore.updateUserInfo(response.data)
+      userInfo.value = {
+        nickname: response.data.nickname || '用户',
+        phone: response.data.phone || ''
+      }
+    }
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+    // 如果token失效，清除登录状态
+    if (error.message.includes('401') || error.message.includes('未授权')) {
+      userStore.logout()
+      isLoggedIn.value = false
+    }
+  }
+}
+
 function editAddress() {
   alert('地址管理功能开发中')
 }
@@ -115,38 +146,73 @@ function showAbout() {
   alert('校园外卖系统 v1.0\n\n一个便捷的校园外卖点餐平台')
 }
 
-function sendCode() {
+async function sendCode() {
   if (!loginForm.value.phone) {
     alert('请输入手机号')
     return
   }
-  alert('验证码已发送')
+  if (!/^1[3-9]\d{9}$/.test(loginForm.value.phone)) {
+    alert('请输入正确的手机号')
+    return
+  }
+  
+  try {
+    sendingCode.value = true
+    const response = await userApi.sendCode({ phone: loginForm.value.phone })
+    if (response.code === 200) {
+      alert('验证码已发送')
+    } else {
+      alert(response.message || '发送失败')
+    }
+  } catch (error) {
+    console.error('发送验证码失败:', error)
+    alert(error.message || '发送失败，请稍后重试')
+  } finally {
+    sendingCode.value = false
+  }
 }
 
-function handleLogin() {
+async function handleLogin() {
   if (!loginForm.value.phone || !loginForm.value.code) {
     alert('请填写完整信息')
     return
   }
 
-  userStore.login({
-    id: 1,
-    nickname: '用户' + loginForm.value.phone.slice(-4),
-    phone: loginForm.value.phone,
-    avatar: '',
-    address: ''
-  })
-
-  userInfo.value = {
-    nickname: userStore.userInfo.nickname,
-    phone: userStore.userInfo.phone
+  try {
+    const response = await userApi.login({
+      phone: loginForm.value.phone,
+      code: loginForm.value.code
+    })
+    
+    if (response.code === 200 && response.data) {
+      // 保存token
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token)
+      }
+      
+      // 更新用户信息
+      if (response.data.userInfo) {
+        userStore.login(response.data.userInfo)
+        userInfo.value = {
+          nickname: response.data.userInfo.nickname || '用户',
+          phone: response.data.userInfo.phone || ''
+        }
+        isLoggedIn.value = true
+        showLogin.value = false
+        loginForm.value = { phone: '', code: '' }
+      }
+    } else {
+      alert(response.message || '登录失败')
+    }
+  } catch (error) {
+    console.error('登录失败:', error)
+    alert(error.message || '登录失败，请稍后重试')
   }
-  isLoggedIn.value = true
-  showLogin.value = false
 }
 
 function handleLogout() {
   if (confirm('确定要退出登录吗？')) {
+    localStorage.removeItem('token')
     userStore.logout()
     userInfo.value = {
       nickname: '用户',

@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 
 export const useCartStore = defineStore('cart', () => {
   const items = ref([])
+  const shopId = ref(null)
+  const shopName = ref('')
 
   const totalCount = computed(() => {
     return items.value.reduce((sum, item) => sum + item.quantity, 0)
@@ -12,7 +14,22 @@ export const useCartStore = defineStore('cart', () => {
     return items.value.reduce((sum, item) => sum + item.price * item.quantity, 0)
   })
 
-  function addItem(product) {
+  function addItem(product, currentShopId = null, currentShopName = '') {
+    // 如果购物车已有商品但店铺不同，清空购物车
+    if (shopId.value && currentShopId && shopId.value !== currentShopId) {
+      if (confirm('购物车中有其他店铺的商品，是否清空后添加？')) {
+        clearCart()
+      } else {
+        return
+      }
+    }
+    
+    // 设置店铺信息
+    if (currentShopId) {
+      shopId.value = currentShopId
+      shopName.value = currentShopName
+    }
+    
     const existingItem = items.value.find(item => item.id === product.id)
     if (existingItem) {
       existingItem.quantity += 1
@@ -44,10 +61,14 @@ export const useCartStore = defineStore('cart', () => {
 
   function clearCart() {
     items.value = []
+    shopId.value = null
+    shopName.value = ''
   }
 
   return {
     items,
+    shopId,
+    shopName,
     totalCount,
     totalPrice,
     addItem,

@@ -65,34 +65,30 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { shopApi } from '../utils/request'
 
-const hotShops = ref([
-  {
-    id: 1,
-    name: '校园食堂',
-    description: '营养丰富，价格实惠',
-    image: 'https://via.placeholder.com/150',
-    rating: 4.8,
-    monthlySales: 1200
-  },
-  {
-    id: 2,
-    name: '咖啡时光',
-    description: '精品咖啡，休闲好去处',
-    image: 'https://via.placeholder.com/150',
-    rating: 4.9,
-    monthlySales: 800
-  },
-  {
-    id: 3,
-    name: '麻辣香锅',
-    description: '麻辣鲜香，回味无穷',
-    image: 'https://via.placeholder.com/150',
-    rating: 4.7,
-    monthlySales: 1500
+const hotShops = ref([])
+const loading = ref(false)
+
+onMounted(async () => {
+  await loadHotShops()
+})
+
+async function loadHotShops() {
+  try {
+    loading.value = true
+    const response = await shopApi.getShopList({ page: 1, pageSize: 3, sort: 'sales' })
+    if (response.code === 200 && response.data) {
+      hotShops.value = response.data.list || []
+    }
+  } catch (error) {
+    console.error('加载热门店铺失败:', error)
+    // 可以显示错误提示
+  } finally {
+    loading.value = false
   }
-])
+}
 </script>
 
 <style scoped>

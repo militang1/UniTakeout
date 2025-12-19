@@ -17,6 +17,7 @@
     </div>
 
     <div class="container">
+      <div v-if="loading" class="loading">加载中...</div>
       <div
         v-for="shop in shops"
         :key="shop.id"
@@ -47,9 +48,12 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch, onMounted } from 'vue'
+import { shopApi } from '../utils/request'
 
 const activeFilter = ref('all')
+const shops = ref([])
+const loading = ref(false)
 
 const filters = [
   { label: '全部', value: 'all' },
@@ -58,52 +62,32 @@ const filters = [
   { label: '距离', value: 'distance' }
 ]
 
-const shops = ref([
-  {
-    id: 1,
-    name: '校园食堂',
-    description: '营养丰富，价格实惠，学生首选',
-    image: 'https://via.placeholder.com/150',
-    rating: 4.8,
-    monthlySales: 1200,
-    deliveryTime: 20,
-    distance: 0.5,
-    tags: ['实惠', '营养']
-  },
-  {
-    id: 2,
-    name: '咖啡时光',
-    description: '精品咖啡，休闲好去处',
-    image: 'https://via.placeholder.com/150',
-    rating: 4.9,
-    monthlySales: 800,
-    deliveryTime: 15,
-    distance: 0.3,
-    tags: ['咖啡', '休闲']
-  },
-  {
-    id: 3,
-    name: '麻辣香锅',
-    description: '麻辣鲜香，回味无穷',
-    image: 'https://via.placeholder.com/150',
-    rating: 4.7,
-    monthlySales: 1500,
-    deliveryTime: 25,
-    distance: 0.8,
-    tags: ['麻辣', '热销']
-  },
-  {
-    id: 4,
-    name: '日式料理',
-    description: '新鲜食材，精致料理',
-    image: 'https://via.placeholder.com/150',
-    rating: 4.9,
-    monthlySales: 600,
-    deliveryTime: 30,
-    distance: 1.2,
-    tags: ['日式', '精致']
+onMounted(() => {
+  loadShops()
+})
+
+watch(activeFilter, () => {
+  loadShops()
+})
+
+async function loadShops() {
+  try {
+    loading.value = true
+    const params = {}
+    if (activeFilter.value !== 'all') {
+      params.sort = activeFilter.value
+    }
+    const response = await shopApi.getShopList(params)
+    if (response.code === 200 && response.data) {
+      shops.value = response.data.list || []
+    }
+  } catch (error) {
+    console.error('加载店铺列表失败:', error)
+    alert(error.message || '加载失败，请稍后重试')
+  } finally {
+    loading.value = false
   }
-])
+}
 </script>
 
 <style scoped>
@@ -230,6 +214,18 @@ const shops = ref([
   color: var(--text-secondary);
   border-radius: 4px;
   font-size: 12px;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--text-light);
+}
+
+.empty {
+  text-align: center;
+  padding: 60px 0;
+  color: var(--text-light);
 }
 </style>
 

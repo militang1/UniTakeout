@@ -6,27 +6,19 @@
     </div>
 
     <div class="tabs">
-      <div
-        v-for="tab in tabs"
-        :key="tab.value"
-        class="tab"
-        :class="{ active: activeTab === tab.value }"
-        @click="activeTab = tab.value"
-      >
+      <div v-for="tab in tabs" :key="tab.value" class="tab" :class="{ active: activeTab === tab.value }"
+        @click="activeTab = tab.value">
         {{ tab.label }}
       </div>
     </div>
 
     <div class="delegation-list">
-      <div
-        v-for="delegation in filteredDelegations"
-        :key="delegation.id"
-        class="delegation-card"
-        @click="viewDelegation(delegation)"
-      >
+      <div v-if="loading" class="loading">加载中...</div>
+      <div v-for="delegation in filteredDelegations" :key="delegation.id" class="delegation-card"
+        @click="viewDelegation(delegation)">
         <div class="card-header">
           <div class="user-info">
-            <div class="avatar">{{ delegation.userName.charAt(0) }}</div>
+            <div class="avatar">{{ (delegation.userName || 'U').charAt(0) }}</div>
             <div>
               <div class="user-name">{{ delegation.userName }}</div>
               <div class="delegation-time">{{ delegation.createTime }}</div>
@@ -50,24 +42,18 @@
           </div>
         </div>
         <div v-if="delegation.status === 'pending'" class="card-actions">
-          <button
-            v-if="delegation.type === 'request'"
-            class="btn btn-primary"
-            @click.stop="acceptDelegation(delegation.id)"
-          >
+          <button v-if="delegation.type === 'request'" class="btn btn-primary"
+            @click.stop="acceptDelegation(delegation.id)">
             接受委托
           </button>
-          <button
-            v-if="delegation.type === 'offer'"
-            class="btn btn-primary"
-            @click.stop="contactDelegation(delegation.id)"
-          >
+          <button v-if="delegation.type === 'offer'" class="btn btn-primary"
+            @click.stop="contactDelegation(delegation.id)">
             联系TA
           </button>
         </div>
       </div>
 
-      <div v-if="filteredDelegations.length === 0" class="empty">
+      <div v-if="!loading && filteredDelegations.length === 0" class="empty">
         <p>暂无委托信息</p>
       </div>
     </div>
@@ -83,18 +69,12 @@
           <div class="form-group">
             <label>委托类型</label>
             <div class="type-selector">
-              <button
-                class="type-btn"
-                :class="{ active: publishForm.type === 'request' }"
-                @click="publishForm.type = 'request'"
-              >
+              <button class="type-btn" :class="{ active: publishForm.type === 'request' }"
+                @click="publishForm.type = 'request'">
                 求带
               </button>
-              <button
-                class="type-btn"
-                :class="{ active: publishForm.type === 'offer' }"
-                @click="publishForm.type = 'offer'"
-              >
+              <button class="type-btn" :class="{ active: publishForm.type === 'offer' }"
+                @click="publishForm.type = 'offer'">
                 可带
               </button>
             </div>
@@ -109,11 +89,7 @@
           </div>
           <div class="form-group">
             <label>描述</label>
-            <textarea
-              v-model="publishForm.description"
-              placeholder="请描述您的需求或可带物品"
-              rows="4"
-            ></textarea>
+            <textarea v-model="publishForm.description" placeholder="请描述您的需求或可带物品" rows="4"></textarea>
           </div>
           <div class="form-group">
             <label>酬金（元）</label>
@@ -121,16 +97,14 @@
           </div>
           <div v-if="publishForm.type === 'offer'" class="form-group">
             <label>可带物品（用逗号分隔）</label>
-            <input
-              v-model="publishForm.items"
-              type="text"
-              placeholder="例如：奶茶,炸鸡,汉堡"
-            />
+            <input v-model="publishForm.items" type="text" placeholder="例如：奶茶,炸鸡,汉堡" />
           </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" @click="showPublishModal = false">取消</button>
-          <button class="btn btn-primary" @click="publishDelegation">发布</button>
+          <button class="btn btn-primary" @click="publishDelegation" :disabled="submitting">
+            {{ submitting ? '发布中...' : '发布' }}
+          </button>
         </div>
       </div>
     </div>
@@ -138,10 +112,13 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { delegationApi } from '../utils/request'
 
 const activeTab = ref('all')
 const showPublishModal = ref(false)
+const loading = ref(false)
+const submitting = ref(false)
 
 const tabs = [
   { label: '全部', value: 'all' },
@@ -158,42 +135,7 @@ const publishForm = ref({
   items: ''
 })
 
-const delegations = ref([
-  {
-    id: 1,
-    type: 'request',
-    userName: '小明',
-    title: '求带校园食堂的宫保鸡丁',
-    description: '今天太忙了，求好心人帮忙带一份宫保鸡丁，送到3号宿舍楼',
-    shopName: '校园食堂',
-    reward: 5,
-    createTime: '2小时前',
-    status: 'pending'
-  },
-  {
-    id: 2,
-    type: 'offer',
-    userName: '小红',
-    title: '可带咖啡时光的饮品',
-    description: '我要去咖啡时光，可以帮忙带饮品，需要的联系我',
-    shopName: '咖啡时光',
-    reward: 3,
-    createTime: '1小时前',
-    status: 'pending',
-    items: ['拿铁', '美式', '卡布奇诺']
-  },
-  {
-    id: 3,
-    type: 'request',
-    userName: '小李',
-    title: '求带麻辣香锅',
-    description: '想吃麻辣香锅，但是不想出门，求带',
-    shopName: '麻辣香锅',
-    reward: 8,
-    createTime: '30分钟前',
-    status: 'pending'
-  }
-])
+const delegations = ref([])
 
 const filteredDelegations = computed(() => {
   if (activeTab.value === 'all') {
@@ -202,16 +144,53 @@ const filteredDelegations = computed(() => {
   return delegations.value.filter(d => d.type === activeTab.value)
 })
 
-function viewDelegation(delegation) {
-  // 查看委托详情
+onMounted(() => {
+  loadDelegations()
+})
+
+watch(activeTab, () => {
+  // 后端也支持 type 过滤，这里优先走后端过滤减少数据量
+  loadDelegations()
+})
+
+async function loadDelegations() {
+  try {
+    loading.value = true
+    const params = {}
+    if (activeTab.value !== 'all') {
+      params.type = activeTab.value
+    }
+    // 默认拉取进行中的委托（如需全部可去掉此行）
+    // params.status = 'pending'
+    const response = await delegationApi.getDelegationList(params)
+    if (response.code === 200 && response.data) {
+      delegations.value = response.data.list || response.data || []
+    }
+  } catch (error) {
+    console.error('加载委托列表失败:', error)
+    alert(error.message || '加载失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function viewDelegation(delegation) {
+  // 可按需补“详情弹窗”，此处保持轻量
   console.log('查看委托:', delegation)
 }
 
-function acceptDelegation(id) {
-  const delegation = delegations.value.find(d => d.id === id)
-  if (delegation) {
-    delegation.status = 'accepted'
-    alert('已接受委托')
+async function acceptDelegation(id) {
+  try {
+    const response = await delegationApi.acceptDelegation(id)
+    if (response.code === 200) {
+      alert('已接受委托')
+      await loadDelegations()
+    } else {
+      alert(response.message || '接受失败')
+    }
+  } catch (error) {
+    console.error('接受委托失败:', error)
+    alert(error.message || '接受失败，请稍后重试')
   }
 }
 
@@ -219,34 +198,53 @@ function contactDelegation(id) {
   alert('联系功能开发中')
 }
 
-function publishDelegation() {
-  if (!publishForm.value.title || !publishForm.value.shopName) {
-    alert('请填写完整信息')
+async function publishDelegation() {
+  if (submitting.value) return
+
+  if (!publishForm.value.title?.trim() || !publishForm.value.shopName?.trim()) {
+    alert('请填写标题和店铺名称')
     return
   }
 
-  const newDelegation = {
-    id: delegations.value.length + 1,
-    type: publishForm.value.type,
-    userName: '我',
-    title: publishForm.value.title,
-    description: publishForm.value.description,
-    shopName: publishForm.value.shopName,
-    reward: publishForm.value.reward,
-    createTime: '刚刚',
-    status: 'pending',
-    items: publishForm.value.items ? publishForm.value.items.split(',') : []
-  }
+  try {
+    submitting.value = true
+    const items = publishForm.value.items
+      ? publishForm.value.items
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+      : []
 
-  delegations.value.unshift(newDelegation)
-  showPublishModal.value = false
-  publishForm.value = {
-    type: 'request',
-    title: '',
-    shopName: '',
-    description: '',
-    reward: 0,
-    items: ''
+    const payload = {
+      type: publishForm.value.type,
+      title: publishForm.value.title.trim(),
+      description: (publishForm.value.description || '').trim(),
+      shopName: publishForm.value.shopName.trim(),
+      reward: Number(publishForm.value.reward || 0),
+      items
+    }
+
+    const response = await delegationApi.createDelegation(payload)
+    if (response.code === 200) {
+      alert('委托发布成功')
+      showPublishModal.value = false
+      publishForm.value = {
+        type: 'request',
+        title: '',
+        shopName: '',
+        description: '',
+        reward: 0,
+        items: ''
+      }
+      await loadDelegations()
+    } else {
+      alert(response.message || '发布失败')
+    }
+  } catch (error) {
+    console.error('发布委托失败:', error)
+    alert(error.message || '发布失败，请稍后重试')
+  } finally {
+    submitting.value = false
   }
 }
 </script>
@@ -426,6 +424,12 @@ function publishDelegation() {
   color: var(--text-light);
 }
 
+.loading {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--text-light);
+}
+
 .modal {
   position: fixed;
   top: 0;
@@ -524,4 +528,3 @@ function publishDelegation() {
   flex: 1;
 }
 </style>
-
