@@ -10,6 +10,8 @@ public interface OrderMapper {
     Order selectByOrderNo(String orderNo);
     List<Order> selectByUserId(Long userId, String status, Integer offset, Integer limit);
     Long countByUserId(Long userId, String status);
+    List<Order> selectByShopId(Long shopId, String status, Integer offset, Integer limit);
+    Long countByShopId(Long shopId, String status);
     void insert(Order order);
     void update(Order order);
 }

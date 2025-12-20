@@ -494,3 +494,4 @@ function goToProduct(product) {
   color: var(--text-light);
 }
 </style>
+

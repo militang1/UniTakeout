@@ -11,5 +11,8 @@ public interface ProductMapper {
     List<Product> selectAll();
     List<Product> searchByKeyword(String keyword, Long shopId, Integer offset, Integer limit);
     Long countByKeyword(String keyword, Long shopId);
+    void insert(Product product);
+    void update(Product product);
+    void delete(Long id);
 }
 

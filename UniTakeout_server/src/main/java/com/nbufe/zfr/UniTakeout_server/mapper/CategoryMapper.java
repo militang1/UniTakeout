@@ -8,5 +8,8 @@ import java.util.List;
 public interface CategoryMapper {
     List<Category> selectByShopId(Long shopId);
     Category selectById(Long id);
+    void insert(Category category);
+    void update(Category category);
+    void delete(Long id);
 }
 

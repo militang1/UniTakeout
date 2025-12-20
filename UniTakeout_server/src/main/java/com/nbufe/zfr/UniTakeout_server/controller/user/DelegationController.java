@@ -1,4 +1,4 @@
-package com.nbufe.zfr.UniTakeout_server.controller;
+package com.nbufe.zfr.UniTakeout_server.controller.user;
 
 import com.nbufe.zfr.UniTakeout_server.common.BaseContext;
 import com.nbufe.zfr.UniTakeout_server.common.Result;

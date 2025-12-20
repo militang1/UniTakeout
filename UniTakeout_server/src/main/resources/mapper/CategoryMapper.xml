@@ -10,5 +10,23 @@
     <select id="selectById" resultType="Category">
         SELECT * FROM category WHERE id = #{id}
     </select>
+    
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO category (shop_id, name, sort_order)
+        VALUES (#{shopId}, #{name}, #{sortOrder})
+    </insert>
+    
+    <update id="update">
+        UPDATE category
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder}</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+    
+    <delete id="delete">
+        DELETE FROM category WHERE id = #{id}
+    </delete>
 </mapper>
 

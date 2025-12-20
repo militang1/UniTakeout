@@ -34,6 +34,24 @@
                 #{address}, #{payMethod}, #{goodsAmount}, #{deliveryFee}, #{totalAmount}, #{remark})
     </insert>
     
+    <select id="selectByShopId" resultType="Order">
+        SELECT * FROM `order`
+        WHERE shop_id = #{shopId}
+        <if test="status != null and status != ''">
+            AND status = #{status}
+        </if>
+        ORDER BY create_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+    
+    <select id="countByShopId" resultType="Long">
+        SELECT COUNT(*) FROM `order`
+        WHERE shop_id = #{shopId}
+        <if test="status != null and status != ''">
+            AND status = #{status}
+        </if>
+    </select>
+    
     <update id="update">
         UPDATE `order`
         <set>

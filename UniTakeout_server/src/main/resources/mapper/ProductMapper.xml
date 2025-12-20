@@ -58,5 +58,26 @@
             </if>
         </where>
     </select>
+    
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO product (shop_id, category_id, name, description, price, image)
+        VALUES (#{shopId}, #{categoryId}, #{name}, #{description}, #{price}, #{image})
+    </insert>
+    
+    <update id="update">
+        UPDATE product
+        <set>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="name != null">name = #{name},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="price != null">price = #{price},</if>
+            <if test="image != null">image = #{image}</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+    
+    <delete id="delete">
+        DELETE FROM product WHERE id = #{id}
+    </delete>
 </mapper>
 

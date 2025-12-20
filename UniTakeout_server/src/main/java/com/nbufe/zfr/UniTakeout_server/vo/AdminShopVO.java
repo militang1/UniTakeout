@@ -1,4 +1,4 @@
-package com.nbufe.zfr.UniTakeout_server.entity;
+package com.nbufe.zfr.UniTakeout_server.vo;
 
 import lombok.Data;
 import java.math.BigDecimal;
@@ -6,9 +6,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
-public class Shop {
+public class AdminShopVO {
     private Long id;
-    private Long ownerId;
     private String name;
     private String description;
     private String image;
@@ -19,7 +18,6 @@ public class Shop {
     private String businessHours;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
-    // 非数据库字段
     private List<String> tags;
 }
 

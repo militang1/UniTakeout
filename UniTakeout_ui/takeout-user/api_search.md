@@ -260,3 +260,4 @@ function highlightKeyword(text, keyword) {
 - 重复搜索词移到最前面
 - 支持清空和删除单条历史
 
+

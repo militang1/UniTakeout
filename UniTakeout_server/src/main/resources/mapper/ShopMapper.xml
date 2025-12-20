@@ -56,5 +56,22 @@
             </if>
         </where>
     </select>
+    
+    <select id="selectByOwnerId" resultType="Shop">
+        SELECT * FROM shop WHERE owner_id = #{ownerId} LIMIT 1
+    </select>
+    
+    <update id="update">
+        UPDATE shop
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="image != null">image = #{image},</if>
+            <if test="deliveryTime != null">delivery_time = #{deliveryTime},</if>
+            <if test="distance != null">distance = #{distance},</if>
+            <if test="businessHours != null">business_hours = #{businessHours}</if>
+        </set>
+        WHERE id = #{id}
+    </update>
 </mapper>
 
