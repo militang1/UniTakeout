@@ -13,3 +13,6 @@ public class ShopUpdateDTO {
     private String businessHours;
 }
 
+
+
+

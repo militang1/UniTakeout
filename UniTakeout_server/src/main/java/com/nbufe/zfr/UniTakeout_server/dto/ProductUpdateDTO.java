@@ -12,3 +12,6 @@ public class ProductUpdateDTO {
     private String image;
 }
 
+
+
+

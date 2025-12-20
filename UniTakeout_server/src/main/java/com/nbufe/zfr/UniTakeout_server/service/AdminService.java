@@ -36,3 +36,6 @@ public interface AdminService {
     StatisticsVO getStatistics(Long shopId);
 }
 
+
+
+

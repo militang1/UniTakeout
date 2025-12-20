@@ -9,3 +9,6 @@ ADD INDEX IF NOT EXISTS `idx_owner_id` (`owner_id`);
 -- 这里我们使用user表作为商家表，通过role字段区分
 -- 如果需要，可以在user表添加role字段：ALTER TABLE `user` ADD COLUMN `role` VARCHAR(20) DEFAULT 'user' COMMENT '角色：user/shop_admin';
 
+
+
+
