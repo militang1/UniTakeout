@@ -39,9 +39,9 @@ public class AuthController {
     @PostMapping("/send-code")
     public Result<Void> sendCode(@RequestBody LoginDTO dto) {
         try {
-            authService.sendCode(dto.getPhone());
+            String code = authService.sendCode(dto.getPhone());
             Result<Void> result = Result.success();
-            result.setMessage("验证码已发送");
+            result.setMessage("验证码已发送-" + code);
             return result;
         } catch (Exception e) {
             return Result.error(e.getMessage());

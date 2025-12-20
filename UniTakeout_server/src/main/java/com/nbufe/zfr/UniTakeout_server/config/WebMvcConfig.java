@@ -20,7 +20,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/shops",
                         "/api/shops/**",
                         "/api/products/**",
-                        "/api/shops/*/products"
+                        "/api/shops/*/products",
+                        "/api/search/**"
                 );
     }
 }

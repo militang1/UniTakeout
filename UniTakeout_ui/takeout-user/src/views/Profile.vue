@@ -155,12 +155,14 @@ async function sendCode() {
     alert('请输入正确的手机号')
     return
   }
-  
+
   try {
     sendingCode.value = true
     const response = await userApi.sendCode({ phone: loginForm.value.phone })
     if (response.code === 200) {
       alert('验证码已发送')
+      // alert(response.message)
+      // console.log(response)
     } else {
       alert(response.message || '发送失败')
     }
@@ -183,13 +185,13 @@ async function handleLogin() {
       phone: loginForm.value.phone,
       code: loginForm.value.code
     })
-    
+
     if (response.code === 200 && response.data) {
       // 保存token
       if (response.data.token) {
         localStorage.setItem('token', response.data.token)
       }
-      
+
       // 更新用户信息
       if (response.data.userInfo) {
         userStore.login(response.data.userInfo)
@@ -402,4 +404,3 @@ function handleLogout() {
   flex: 1;
 }
 </style>
-

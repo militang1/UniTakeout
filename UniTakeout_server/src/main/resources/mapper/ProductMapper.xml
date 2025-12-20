@@ -27,5 +27,36 @@
         LEFT JOIN shop s ON p.shop_id = s.id
         ORDER BY p.id DESC
     </select>
+    
+    <select id="searchByKeyword" resultType="Product">
+        SELECT p.*, c.name as category_name, s.name as shop_name
+        FROM product p
+        LEFT JOIN category c ON p.category_id = c.id
+        LEFT JOIN shop s ON p.shop_id = s.id
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (p.name LIKE CONCAT('%', #{keyword}, '%') 
+                OR p.description LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="shopId != null">
+                AND p.shop_id = #{shopId}
+            </if>
+        </where>
+        ORDER BY p.sales DESC, p.id DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+    
+    <select id="countByKeyword" resultType="Long">
+        SELECT COUNT(*) FROM product p
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (p.name LIKE CONCAT('%', #{keyword}, '%') 
+                OR p.description LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="shopId != null">
+                AND p.shop_id = #{shopId}
+            </if>
+        </where>
+    </select>
 </mapper>
 

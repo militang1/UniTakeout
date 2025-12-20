@@ -7,6 +7,6 @@ import com.nbufe.zfr.UniTakeout_server.vo.LoginVO;
 public interface AuthService {
     LoginVO login(LoginDTO dto);
     LoginVO register(RegisterDTO dto);
-    void sendCode(String phone);
+    String sendCode(String phone);
 }
 

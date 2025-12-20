@@ -29,5 +29,32 @@
             </if>
         </where>
     </select>
+    
+    <select id="searchByKeyword" resultType="Shop">
+        SELECT * FROM shop
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (name LIKE CONCAT('%', #{keyword}, '%') 
+                OR description LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        <choose>
+            <when test="sort == 'sales'">ORDER BY monthly_sales DESC</when>
+            <when test="sort == 'rating'">ORDER BY rating DESC</when>
+            <when test="sort == 'distance'">ORDER BY distance ASC</when>
+            <otherwise>ORDER BY id DESC</otherwise>
+        </choose>
+        LIMIT #{offset}, #{limit}
+    </select>
+    
+    <select id="countByKeyword" resultType="Long">
+        SELECT COUNT(*) FROM shop
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (name LIKE CONCAT('%', #{keyword}, '%') 
+                OR description LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+    </select>
 </mapper>
 

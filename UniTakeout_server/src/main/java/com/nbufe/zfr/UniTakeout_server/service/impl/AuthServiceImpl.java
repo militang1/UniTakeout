@@ -91,7 +91,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void sendCode(String phone) {
+    public String sendCode(String phone) {
         VerificationCode latestCode = codeMapper.selectLatestByPhone(phone);
         if (latestCode != null) {
             long seconds = ChronoUnit.SECONDS.between(latestCode.getCreateTime(), LocalDateTime.now());
@@ -108,6 +108,7 @@ public class AuthServiceImpl implements AuthService {
         
         // 这里应该调用短信服务发送验证码，暂时只打印日志
         System.out.println("发送验证码到 " + phone + ": " + code);
+        return code;
     }
 }
 

@@ -9,5 +9,7 @@ public interface ProductMapper {
     Product selectById(Long id);
     List<Product> selectByShopId(Long shopId, Long categoryId);
     List<Product> selectAll();
+    List<Product> searchByKeyword(String keyword, Long shopId, Integer offset, Integer limit);
+    Long countByKeyword(String keyword, Long shopId);
 }
 

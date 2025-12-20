@@ -9,5 +9,7 @@ public interface ShopMapper {
     Shop selectById(Long id);
     List<Shop> selectList(String keyword, String sort, Integer offset, Integer limit);
     Long count(String keyword);
+    List<Shop> searchByKeyword(String keyword, String sort, Integer offset, Integer limit);
+    Long countByKeyword(String keyword);
 }
 

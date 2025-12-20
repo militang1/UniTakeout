@@ -7,6 +7,7 @@ import OrderConfirm from '../views/OrderConfirm.vue'
 import DelegationSquare from '../views/DelegationSquare.vue'
 import AIAgent from '../views/AIAgent.vue'
 import Profile from '../views/Profile.vue'
+import Search from '../views/Search.vue'
 
 const routes = [
   {
@@ -48,6 +49,11 @@ const routes = [
     path: '/profile',
     name: 'Profile',
     component: Profile
+  },
+  {
+    path: '/search',
+    name: 'Search',
+    component: Search
   }
 ]
 

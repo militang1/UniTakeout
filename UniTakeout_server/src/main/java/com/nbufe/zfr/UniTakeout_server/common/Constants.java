@@ -9,7 +9,7 @@ public class Constants {
     // 验证码有效期（5分钟）
     public static final int CODE_EXPIRATION = 5 * 60;
     // 验证码发送间隔（1分钟）
-    public static final int CODE_SEND_INTERVAL = 60;
+    public static final int CODE_SEND_INTERVAL = 1;
     
     // 订单状态
     public static final String ORDER_STATUS_PENDING = "pending";

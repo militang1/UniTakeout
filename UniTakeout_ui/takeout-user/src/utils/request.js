@@ -38,3 +38,9 @@ export const userApi = {
   updateUserInfo: (data) => api.put('/user/info', data)
 }
 
+export const searchApi = {
+  searchShops: (params) => api.get('/search/shops', { params }),
+  searchProducts: (params) => api.get('/search/products', { params }),
+  searchAll: (params) => api.get('/search', { params })
+}
+

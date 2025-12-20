@@ -1,7 +1,7 @@
 <template>
   <div class="home">
     <div class="header">
-      <div class="search-bar" @click="$router.push('/shops')">
+      <div class="search-bar" @click="$router.push('/search')">
         <span class="search-icon">🔍</span>
         <span class="search-placeholder">搜索店铺、商品</span>
       </div>
