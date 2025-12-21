@@ -36,6 +36,16 @@ export const statisticsApi = {
   getStatistics: () => api.get('/statistics')
 }
 
+export const uploadApi = {
+  // file: File
+  uploadImage: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/upload/image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  }
+}
 
 
 

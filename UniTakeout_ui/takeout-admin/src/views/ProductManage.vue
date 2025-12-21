@@ -74,14 +74,31 @@
             <textarea v-model="productForm.description" placeholder="请输入商品描述" rows="3"></textarea>
           </div>
           <div class="form-group">
-            <label>商品图片URL</label>
-            <input v-model="productForm.image" type="url" placeholder="https://example.com/image.jpg" />
+            <label>商品图片</label>
+            <div class="image-upload">
+              <input ref="productFileInput" type="file" accept="image/*" @change="handleProductImageChange"
+                style="display:none" />
+
+              <div class="image-preview clickable" @click="triggerProductFileSelect"
+                :title="productForm.image ? '点击更换图片' : '点击上传图片'">
+                <img v-if="productForm.image" :src="productForm.image" alt="商品图片" class="preview" />
+
+                <div v-else class="placeholder">
+                  <div class="placeholder-text">点击上传</div>
+                </div>
+
+                <div class="upload-overlay" v-if="productUploading">上传中...</div>
+              </div>
+
+              <input v-model="productForm.image" type="url" placeholder="https://example.com/image.jpg"
+                class="url-input" />
+            </div>
           </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" @click="closeModal">取消</button>
-          <button class="btn btn-primary" @click="saveProduct" :disabled="saving">
-            {{ saving ? '保存中...' : '保存' }}
+          <button class="btn btn-primary" @click="saveProduct" :disabled="saving || productUploading">
+            {{ saving ? '保存中...' : (productUploading ? '上传中...' : '保存') }}
           </button>
         </div>
       </div>
@@ -91,7 +108,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { productApi, categoryApi } from '../utils/request'
+import { productApi, categoryApi, uploadApi } from '../utils/request'
 
 const products = ref([])
 const categories = ref([])
@@ -100,6 +117,12 @@ const showAddModal = ref(false)
 const showEditModal = ref(false)
 const saving = ref(false)
 const editingProductId = ref(null)
+const productUploading = ref(false)
+const productFileInput = ref(null)
+
+function triggerProductFileSelect() {
+  if (productFileInput.value) productFileInput.value.click()
+}
 
 const productForm = ref({
   name: '',
@@ -193,6 +216,32 @@ async function saveProduct() {
     alert(error.message || '保存失败，请稍后重试')
   } finally {
     saving.value = false
+  }
+}
+
+async function handleProductImageChange(event) {
+  const file = event.target.files && event.target.files[0]
+  if (!file) return
+  if (file.size > 5 * 1024 * 1024) {
+    alert('文件大小不能超过 5MB')
+    event.target.value = ''
+    return
+  }
+
+  productUploading.value = true
+  try {
+    const response = await uploadApi.uploadImage(file)
+    if (response.code === 200) {
+      productForm.value.image = response.data
+    } else {
+      alert(response.message || '上传失败')
+    }
+  } catch (err) {
+    console.error('上传商品图片失败:', err)
+    alert(err.message || '上传失败，请稍后重试')
+  } finally {
+    productUploading.value = false
+    event.target.value = ''
   }
 }
 
@@ -316,8 +365,77 @@ async function deleteProduct(id) {
   padding: 20px;
   border-top: 1px solid var(--border-color);
 }
+
+.image-upload input[type="file"] {
+  display: none;
+}
+
+.image-upload {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.image-preview {
+  width: 160px;
+  height: 110px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-soft, #f8f9fa);
+  border: 1px dashed var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+
+.image-preview:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+.image-preview .preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.placeholder {
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.placeholder-icon {
+  font-size: 28px;
+}
+
+.placeholder-text {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.upload-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.url-input {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  font-size: 13px;
+}
 </style>
-
-
-
-
