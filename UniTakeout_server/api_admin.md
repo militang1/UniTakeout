@@ -522,9 +522,110 @@ Authorization: Bearer {token}
 
 ---
 
-### 6. 数据统计
+### 6. 文件上传
 
-#### 6.1 获取统计数据
+#### 6.1 上传图片
+- **URL**: `/upload/image`
+- **Method**: `POST`
+- **认证**: 需要
+- **Content-Type**: `multipart/form-data`
+- **说明**: 上传图片到阿里云OSS，返回图片URL
+
+**请求参数** (FormData):
+- `file`: 图片文件（必填）
+
+**文件要求**:
+- 支持格式：jpg, jpeg, png, gif, bmp, webp
+- 文件大小：不超过5MB
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "上传成功",
+  "data": "https://bucket-name.oss-cn-hangzhou.aliyuncs.com/images/2024/01/15/abc123def456.jpg"
+}
+```
+
+**错误响应示例**:
+```json
+{
+  "code": 400,
+  "message": "文件不能为空",
+  "data": null
+}
+```
+
+**使用说明**:
+1. 前端使用 `multipart/form-data` 格式上传文件
+2. 上传成功后，将返回的URL保存到商品或店铺的image字段
+3. 图片会按日期自动分类存储：`images/yyyy/MM/dd/文件名`
+4. 文件名使用UUID生成，确保唯一性
+
+**前端示例** (JavaScript):
+```javascript
+const formData = new FormData();
+formData.append('file', file);
+
+fetch('/api/admin/upload/image', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer ' + token
+  },
+  body: formData
+})
+.then(response => response.json())
+.then(data => {
+  if (data.code === 200) {
+    console.log('图片URL:', data.data);
+    // 使用返回的URL更新商品或店铺信息
+  }
+});
+```
+
+**前端示例** (Vue 3):
+```vue
+<template>
+  <input type="file" @change="handleFileChange" accept="image/*" />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const handleFileChange = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  try {
+    const response = await fetch('/api/admin/upload/image', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token
+      },
+      body: formData
+    });
+    
+    const result = await response.json();
+    if (result.code === 200) {
+      console.log('图片URL:', result.data);
+      // 使用返回的URL
+    }
+  } catch (error) {
+    console.error('上传失败:', error);
+  }
+};
+</script>
+```
+
+---
+
+
+### 7. 数据统计
+
+#### 7.1 获取统计数据
 - **URL**: `/statistics`
 - **Method**: `GET`
 - **认证**: 需要
