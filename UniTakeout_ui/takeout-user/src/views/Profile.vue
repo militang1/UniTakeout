@@ -87,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useUserStore } from '../stores/user'
 import { userApi } from '../utils/request'
 
@@ -100,7 +100,8 @@ const userInfo = ref({
   phone: userStore.userInfo.phone || ''
 })
 
-const isLoggedIn = ref(userStore.isLoggedIn)
+// 直接基于 store 的状态创建计算属性，保证页面能响应 store 的更新
+const isLoggedIn = computed(() => userStore.isLoggedIn.value)
 
 const loginForm = ref({
   phone: '',
@@ -108,8 +109,12 @@ const loginForm = ref({
 })
 
 onMounted(async () => {
-  // 如果已登录，获取用户信息
-  if (userStore.isLoggedIn) {
+  // 如果存在 token，但 store 还没标记为登录，尝试拉取用户信息并设置登录状态；
+  // 否则如果 store 已经登录，也刷新用户信息。
+  const token = localStorage.getItem('token')
+  if (token && !userStore.isLoggedIn.value) {
+    await loadUserInfo()
+  } else if (userStore.isLoggedIn.value) {
     await loadUserInfo()
   }
 })
@@ -118,7 +123,8 @@ async function loadUserInfo() {
   try {
     const response = await userApi.getUserInfo()
     if (response.code === 200 && response.data) {
-      userStore.updateUserInfo(response.data)
+      // 使用 login() 确保 isLoggedIn 会被正确设置
+      userStore.login(response.data)
       userInfo.value = {
         nickname: response.data.nickname || '用户',
         phone: response.data.phone || ''
@@ -129,7 +135,6 @@ async function loadUserInfo() {
     // 如果token失效，清除登录状态
     if (error.message.includes('401') || error.message.includes('未授权')) {
       userStore.logout()
-      isLoggedIn.value = false
     }
   }
 }
@@ -199,7 +204,7 @@ async function handleLogin() {
           nickname: response.data.userInfo.nickname || '用户',
           phone: response.data.userInfo.phone || ''
         }
-        isLoggedIn.value = true
+        // store.login 已处理登录状态
         showLogin.value = false
         loginForm.value = { phone: '', code: '' }
       }
@@ -220,7 +225,6 @@ function handleLogout() {
       nickname: '用户',
       phone: ''
     }
-    isLoggedIn.value = false
   }
 }
 </script>

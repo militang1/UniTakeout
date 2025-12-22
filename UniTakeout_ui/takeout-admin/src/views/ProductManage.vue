@@ -439,3 +439,4 @@ async function deleteProduct(id) {
   font-size: 13px;
 }
 </style>
+

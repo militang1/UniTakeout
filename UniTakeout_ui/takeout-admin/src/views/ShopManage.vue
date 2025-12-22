@@ -259,3 +259,4 @@ async function handleShopImageChange(event) {
   font-size: 13px;
 }
 </style>
+
