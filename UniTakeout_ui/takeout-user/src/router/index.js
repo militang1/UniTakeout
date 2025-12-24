@@ -51,6 +51,11 @@ const routes = [
     component: Profile
   },
   {
+    path: '/address',
+    name: 'AddressManage',
+    component: () => import('../views/AddressManage.vue')
+  },
+  {
     path: '/search',
     name: 'Search',
     component: Search

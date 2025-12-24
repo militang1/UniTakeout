@@ -8,7 +8,7 @@
           <p class="user-phone">{{ userInfo.phone || '点击登录' }}</p>
         </div>
       </div>
-      <button v-if="!isLoggedIn" class="btn btn-primary" @click="showLogin = true">
+      <button v-if="!isLoggedIn" class="btn btn-primary" @click="openLogin">
         登录
       </button>
     </div>
@@ -59,7 +59,7 @@
     <div v-if="showLogin" class="modal" @click="showLogin = false">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h3>登录</h3>
+          <h3>{{ mode === 'login' ? '登录' : '注册' }}</h3>
           <span @click="showLogin = false">✕</span>
         </div>
         <div class="modal-body">
@@ -67,6 +67,12 @@
             <label>手机号</label>
             <input v-model="loginForm.phone" type="tel" placeholder="请输入手机号" />
           </div>
+
+          <div v-if="mode === 'register'" class="form-group">
+            <label>昵称</label>
+            <input v-model="loginForm.nickname" type="text" placeholder="请输入昵称" />
+          </div>
+
           <div class="form-group">
             <label>验证码</label>
             <div class="code-input">
@@ -76,10 +82,16 @@
               </button>
             </div>
           </div>
+
+          <div style="margin-top:8px; font-size:13px; color:#666;">
+            <span v-if="mode === 'login'">没有账号？<a href="#" @click.prevent="mode = 'register'">去注册</a></span>
+            <span v-else>已有账号？<a href="#" @click.prevent="mode = 'login'">去登录</a></span>
+          </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" @click="showLogin = false">取消</button>
-          <button class="btn btn-primary" @click="handleLogin">登录</button>
+          <button class="btn btn-primary" @click="mode === 'login' ? handleLogin() : handleRegister()">{{ mode ===
+            'login' ? '登录' : '注册' }}</button>
         </div>
       </div>
     </div>
@@ -87,13 +99,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { userApi } from '../utils/request'
 
 const userStore = useUserStore()
+const router = useRouter()
 const showLogin = ref(false)
 const sendingCode = ref(false)
+const mode = ref('login')
 
 const userInfo = ref({
   nickname: userStore.userInfo.nickname || '用户',
@@ -103,10 +118,34 @@ const userInfo = ref({
 // 直接基于 store 的状态创建计算属性，保证页面能响应 store 的更新
 const isLoggedIn = computed(() => userStore.isLoggedIn.value)
 
+// 同步 store 的用户信息到本地显示
+watch(() => userStore.userInfo.value, (val) => {
+  if (val && val.nickname !== undefined) {
+    userInfo.value = {
+      nickname: val.nickname || '用户',
+      phone: val.phone || ''
+    }
+  }
+})
+
+// 关闭 modal 时重置表单与模式
+watch(showLogin, (val) => {
+  if (!val) {
+    mode.value = 'login'
+    loginForm.value = { phone: '', code: '', nickname: '' }
+  }
+})
+
 const loginForm = ref({
   phone: '',
-  code: ''
+  code: '',
+  nickname: ''
 })
+
+function openLogin() {
+  mode.value = 'login'
+  showLogin.value = true
+}
 
 onMounted(async () => {
   // 如果存在 token，但 store 还没标记为登录，尝试拉取用户信息并设置登录状态；
@@ -140,7 +179,7 @@ async function loadUserInfo() {
 }
 
 function editAddress() {
-  alert('地址管理功能开发中')
+  router.push('/address')
 }
 
 function showSettings() {
@@ -206,7 +245,7 @@ async function handleLogin() {
         }
         // store.login 已处理登录状态
         showLogin.value = false
-        loginForm.value = { phone: '', code: '' }
+        loginForm.value = { phone: '', code: '', nickname: '' }
       }
     } else {
       alert(response.message || '登录失败')
@@ -214,6 +253,43 @@ async function handleLogin() {
   } catch (error) {
     console.error('登录失败:', error)
     alert(error.message || '登录失败，请稍后重试')
+  }
+}
+
+async function handleRegister() {
+  if (!loginForm.value.phone || !loginForm.value.code || !loginForm.value.nickname) {
+    alert('请填写手机号、昵称与验证码')
+    return
+  }
+
+  try {
+    const payload = {
+      phone: loginForm.value.phone,
+      code: loginForm.value.code,
+      nickname: loginForm.value.nickname
+    }
+    const response = await userApi.register(payload)
+
+    if (response.code === 200 && response.data) {
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token)
+      }
+
+      if (response.data.userInfo) {
+        userStore.login(response.data.userInfo)
+        userInfo.value = {
+          nickname: response.data.userInfo.nickname || '用户',
+          phone: response.data.userInfo.phone || ''
+        }
+        showLogin.value = false
+        loginForm.value = { phone: '', code: '', nickname: '' }
+      }
+    } else {
+      alert(response.message || '注册失败')
+    }
+  } catch (error) {
+    console.error('注册失败:', error)
+    alert(error.message || '注册失败，请稍后重试')
   }
 }
 
