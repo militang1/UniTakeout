@@ -27,7 +27,9 @@ export const delegationApi = {
 
 export const aiApi = {
   getRecommendations: (data) => api.post('/ai/recommend', data),
-  autoOrder: (data) => api.post('/ai/auto-order', data)
+  autoOrder: (data) => api.post('/ai/auto-order', data),
+  // agent-suggest: AI agent 返回固定 JSON（reply + order），供前端展示并让用户确认下单
+  agentSuggest: (data) => api.post('/ai/agent-suggest', data)
 }
 
 export const userApi = {

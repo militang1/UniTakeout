@@ -8,22 +8,13 @@
     <div class="container">
       <div class="chat-container">
         <div class="chat-messages" ref="chatContainer">
-          <div
-            v-for="(message, index) in messages"
-            :key="index"
-            class="message"
-            :class="message.type"
-          >
+          <div v-for="(message, index) in messages" :key="index" class="message" :class="message.type">
             <div v-if="message.type === 'ai'" class="avatar">🤖</div>
             <div class="message-content">
               <div class="message-text">{{ message.text }}</div>
               <div v-if="message.recommendations" class="recommendations">
-                <div
-                  v-for="rec in message.recommendations"
-                  :key="rec.id"
-                  class="recommendation-card"
-                  @click="selectRecommendation(rec)"
-                >
+                <div v-for="rec in message.recommendations" :key="rec.id" class="recommendation-card"
+                  @click="selectRecommendation(rec)">
                   <div class="rec-image">
                     <img :src="rec.image" :alt="rec.name" />
                   </div>
@@ -46,8 +37,8 @@
                 <div class="order-total">
                   <span>总计：¥{{ message.order.total }}</span>
                 </div>
-                <button class="btn btn-primary" @click="confirmOrder(message.order)">
-                  确认下单
+                <button class="btn btn-primary" :disabled="aiPlacing" @click="message.isSuggest ? confirmAndPlaceOrder(message) : confirmOrder(message.order)">
+                  {{ message.isSuggest ? (aiPlacing ? '下单中...' : '一键下单') : '确认下单' }}
                 </button>
               </div>
             </div>
@@ -55,25 +46,16 @@
         </div>
 
         <div class="chat-input">
-          <input
-            v-model="inputText"
-            type="text"
-            placeholder="告诉AI你的需求，例如：我想吃辣的，预算30元"
-            @keyup.enter="sendMessage"
-          />
-          <button class="send-btn" @click="sendMessage">发送</button>
+          <input v-model="inputText" :disabled="aiLoading" type="text" placeholder="告诉AI你的需求，例如：我想吃辣的" @keyup.enter="sendMessage" />
+          <button class="send-btn" :disabled="aiLoading" @click="sendMessage">{{ aiLoading ? '发送中...' : '发送' }}</button>
         </div>
       </div>
 
       <div class="quick-questions">
         <h3>快速提问</h3>
         <div class="question-tags">
-          <span
-            v-for="question in quickQuestions"
-            :key="question"
-            class="question-tag"
-            @click="inputText = question; sendMessage()"
-          >
+          <span v-for="question in quickQuestions" :key="question" class="question-tag"
+            @click="inputText = question; sendMessage()">
             {{ question }}
           </span>
         </div>
@@ -84,11 +66,17 @@
 
 <script setup>
 import { ref, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { useCartStore } from '../stores/cart'
+import { useUserStore } from '../stores/user'
+import { aiApi, orderApi } from '../utils/request'
 
 const cartStore = useCartStore()
+const router = useRouter()
+const userStore = useUserStore()
 const chatContainer = ref(null)
 const inputText = ref('')
+const aiLoading = ref(false)
 
 const quickQuestions = [
   '推荐今天的午餐',
@@ -115,8 +103,8 @@ function scrollToBottom() {
   })
 }
 
-function sendMessage() {
-  if (!inputText.value.trim()) return
+async function sendMessage() {
+  if (!inputText.value.trim() || aiLoading.value) return
 
   // 添加用户消息
   messages.value.push({
@@ -128,71 +116,44 @@ function sendMessage() {
   inputText.value = ''
   scrollToBottom()
 
-  // 模拟AI回复
-  setTimeout(() => {
-    let aiResponse = {
-      type: 'ai',
-      text: '',
-      recommendations: null,
-      order: null
+  // 调用后端 agent-suggest 接口
+  aiLoading.value = true
+  try {
+    const payload = {
+      query: userInput,
+      userId: userStore.userInfo.id || null,
+      address: userStore.userInfo.address || ''
     }
+    const res = await aiApi.agentSuggest(payload)
 
-    if (userInput.includes('推荐') || userInput.includes('推荐')) {
-      aiResponse.text = '根据你的需求，我为你推荐以下美食：'
-      aiResponse.recommendations = [
-        {
-          id: 1,
-          name: '麻辣香锅',
-          shopName: '麻辣香锅店',
-          price: 35,
-          rating: 4.8,
-          image: 'https://via.placeholder.com/100'
-        },
-        {
-          id: 2,
-          name: '宫保鸡丁',
-          shopName: '校园食堂',
-          price: 18,
-          rating: 4.7,
-          image: 'https://via.placeholder.com/100'
-        },
-        {
-          id: 3,
-          name: '水煮鱼',
-          shopName: '川味餐厅',
-          price: 42,
-          rating: 4.9,
-          image: 'https://via.placeholder.com/100'
-        }
-      ]
-    } else if (userInput.includes('下单') || userInput.includes('点餐')) {
-      aiResponse.text = '我为你推荐以下组合，点击确认即可下单：'
-      aiResponse.order = {
-        shopName: '校园食堂',
-        items: [
-          { id: 1, name: '宫保鸡丁', quantity: 1, price: 18 },
-          { id: 2, name: '米饭', quantity: 2, price: 2 },
-          { id: 3, name: '可乐', quantity: 1, price: 5 }
-        ],
-        total: 27
+    if (res && (res.code === 200 || res.code === 1) && res.data) {
+      const aiResponse = {
+        type: 'ai',
+        text: res.data.reply || res.data.message || 'AI 未返回文本',
+        recommendations: res.data.recommendations || null,
+        order: res.data.order || null,
+        isSuggest: true
       }
+      messages.value.push(aiResponse)
+      scrollToBottom()
     } else {
-      aiResponse.text = '我理解你的需求。让我为你推荐一些美食：'
-      aiResponse.recommendations = [
-        {
-          id: 1,
-          name: '推荐套餐A',
-          shopName: '校园食堂',
-          price: 25,
-          rating: 4.8,
-          image: 'https://via.placeholder.com/100'
-        }
-      ]
+      // 失败时回退为简单消息
+      const aiResponse = {
+        type: 'ai',
+        text: res.message || 'AI 服务不可用，请稍后重试',
+        recommendations: null,
+        order: null
+      }
+      messages.value.push(aiResponse)
+      scrollToBottom()
     }
-
-    messages.value.push(aiResponse)
+  } catch (err) {
+    console.error('agentSuggest 调用失败', err)
+    messages.value.push({ type: 'ai', text: '调用 AI 服务失败，请稍后重试', recommendations: null, order: null })
     scrollToBottom()
-  }, 1000)
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 function selectRecommendation(rec) {
@@ -218,13 +179,14 @@ function selectRecommendation(rec) {
 }
 
 function confirmOrder(order) {
-  // 将订单添加到购物车
+  // 兼容：把订单项加入购物车（保留原有行为）
+  if (!order || !order.items) return
   order.items.forEach(item => {
     cartStore.addItem({
       id: item.id,
       name: item.name,
       price: item.price,
-      quantity: item.quantity
+      quantity: item.quantity || 1
     })
   })
 
@@ -236,12 +198,44 @@ function confirmOrder(order) {
   setTimeout(() => {
     messages.value.push({
       type: 'ai',
-      text: '订单已创建！请前往购物车查看并完成支付。',
+      text: '已加入购物车，请前往购物车完成下单。',
       recommendations: null,
       order: null
     })
     scrollToBottom()
   }, 500)
+}
+
+const aiPlacing = ref(false)
+
+async function confirmAndPlaceOrder(message) {
+  if (!message || !message.order) return
+  if (aiPlacing.value) return
+  aiPlacing.value = true
+  try {
+    if (!userStore.isLoggedIn) {
+      alert('请先登录后再下单')
+      router.push('/profile')
+      return
+    }
+
+    const payload = message.order
+    const res = await orderApi.createOrder(payload)
+    if (res && (res.code === 200 || res.code === 1) && res.data) {
+      messages.value.push({ type: 'user', text: '确认下单' })
+      messages.value.push({ type: 'ai', text: '订单已创建！订单号：' + (res.data.orderNo || res.data.orderId || ''), recommendations: null, order: null })
+      scrollToBottom()
+      // 跳转到订单页查看
+      router.push('/order')
+    } else {
+      alert(res.message || '下单失败')
+    }
+  } catch (err) {
+    console.error('下单失败', err)
+    alert(err.message || '下单失败，请稍后重试')
+  } finally {
+    aiPlacing.value = false
+  }
 }
 </script>
 
@@ -473,5 +467,10 @@ function confirmOrder(order) {
   background: var(--primary-color);
   color: white;
 }
-</style>
 
+.container {
+  max-width: 750px;
+  margin: 0 auto;
+  padding: 0 0px;
+}
+</style>

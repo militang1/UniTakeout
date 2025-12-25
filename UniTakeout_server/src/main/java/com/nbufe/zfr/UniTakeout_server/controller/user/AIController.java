@@ -44,5 +44,19 @@ public class AIController {
         String reply = aiService.chat(message);
         return Map.of("reply", reply);
     }
+
+    /**
+     * POST /api/ai/agent-suggest
+     * 使用 AI agent 分析用户指令并返回固定 JSON，包含 reply 与 order（OrderCreateDTO 结构）
+     */
+    @PostMapping("/agent-suggest")
+    public Result<Map<String, Object>> agentSuggest(@RequestBody AIAutoOrderDTO dto) {
+        try {
+            Map<String, Object> result = aiService.agentSuggest(dto);
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
 }
 

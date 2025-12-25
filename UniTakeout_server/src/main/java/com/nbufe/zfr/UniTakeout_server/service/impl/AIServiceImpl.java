@@ -132,5 +132,134 @@ public class AIServiceImpl implements AIService {
         
         return orderService.create(dto.getUserId(), orderDTO);
     }
+
+    @Override
+    public Map<String, Object> agentSuggest(AIAutoOrderDTO dto) {
+        List<Product> products = productMapper.selectAll();
+
+        // 精简产品列表用于上下文（避免过多字段）
+        List<Map<String, Object>> simpleProducts = new ArrayList<>();
+        for (Product p : products) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", p.getId());
+            m.put("shopId", p.getShopId());
+            m.put("shopName", p.getShopName());
+            m.put("name", p.getName());
+            m.put("price", p.getPrice());
+            simpleProducts.add(m);
+        }
+
+        // 构造 system prompt，要求 AI 返回固定的 JSON
+        String systemPrompt = "You are an assistant for a campus takeout system. " +
+                "Given the product list and a user request, you should output a SINGLE JSON object and NOTHING else. " +
+                "The JSON must have two fields: 'reply' (string) and 'order' (object). 'order' should follow the order create schema: " +
+                "{shopId, shopName, contactName, contactPhone, address, payMethod, items: [{productId, name, quantity, price}], goodsAmount, deliveryFee, totalAmount, remark}. " +
+                "All prices must be numbers. If you select items, ensure they exist in the provided product list. " +
+                "Respond only with the JSON and do not include any explanation or markdown.";
+
+        String userMessage = "User request: " + (dto.getQuery() == null ? "" : dto.getQuery()) + "\n" +
+                "Address: " + (dto.getAddress() == null ? "" : dto.getAddress()) + "\n" +
+                "Products: " + simpleProducts.toString() + "\n" +
+                "Constraints: budget default 30 if not specified, try to choose suitable items and a shop.";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(config.getApiKey());
+
+        List<Map<String, String>> messages = List.of(
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", userMessage)
+        );
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", config.getModel());
+        body.put("messages", messages);
+        body.put("stream", false);
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        String url = config.getBaseUrl() + "/chat/completions";
+        ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
+
+        List<Map<String, Object>> choices = (List<Map<String, Object>>) response.getBody().get("choices");
+        Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+        String content = message.get("content").toString();
+
+        // 试图从 content 中提取 JSON 对象
+        String jsonText = null;
+        int first = content.indexOf('{');
+        int last = content.lastIndexOf('}');
+        if (first >= 0 && last >= 0 && last >= first) {
+            jsonText = content.substring(first, last + 1);
+        } else {
+            throw new RuntimeException("AI 返回未包含 JSON: " + content);
+        }
+
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        Map<String, Object> parsed;
+        try {
+            parsed = mapper.readValue(jsonText, Map.class);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new RuntimeException("无法解析 AI 返回的 JSON: " + e.getMessage());
+        }
+
+        // 构建 OrderCreateDTO 并校验/计算金额
+        Map<String, Object> orderMap = (Map<String, Object>) parsed.get("order");
+        if (orderMap == null) {
+            throw new RuntimeException("AI 返回的 JSON 不包含 order 字段");
+        }
+
+        OrderCreateDTO orderDTO = new OrderCreateDTO();
+        if (orderMap.get("shopId") != null) {
+            Number n = (Number) orderMap.get("shopId");
+            orderDTO.setShopId(n.longValue());
+        }
+        orderDTO.setShopName((String) orderMap.get("shopName"));
+        orderDTO.setContactName(orderMap.get("contactName") == null ? "用户" : (String) orderMap.get("contactName"));
+        orderDTO.setContactPhone(orderMap.get("contactPhone") == null ? "13800138000" : (String) orderMap.get("contactPhone"));
+        orderDTO.setAddress(dto.getAddress() == null ? (String) orderMap.get("address") : dto.getAddress());
+        orderDTO.setPayMethod(orderMap.get("payMethod") == null ? "wechat" : (String) orderMap.get("payMethod"));
+
+        List<Map<String, Object>> itemsRaw = (List<Map<String, Object>>) orderMap.get("items");
+        List<OrderItemDTO> items = new ArrayList<>();
+        BigDecimal goodsAmount = BigDecimal.ZERO;
+        if (itemsRaw != null) {
+            for (Map<String, Object> ir : itemsRaw) {
+                OrderItemDTO it = new OrderItemDTO();
+                if (ir.get("productId") != null) {
+                    Number pid = (Number) ir.get("productId");
+                    it.setProductId(pid.longValue());
+                }
+                it.setName((String) ir.get("name"));
+                Integer qty = ir.get("quantity") == null ? 1 : ((Number) ir.get("quantity")).intValue();
+                it.setQuantity(qty);
+                BigDecimal price;
+                if (ir.get("price") != null) {
+                    price = new BigDecimal(ir.get("price").toString());
+                } else {
+                    // 尝试从产品库查价格
+                    price = products.stream()
+                            .filter(p -> p.getId().equals(it.getProductId()))
+                            .map(Product::getPrice)
+                            .findFirst()
+                            .orElse(BigDecimal.ZERO);
+                }
+                it.setPrice(price);
+                items.add(it);
+                goodsAmount = goodsAmount.add(price.multiply(new BigDecimal(it.getQuantity())));
+            }
+        }
+
+        orderDTO.setItems(items);
+        orderDTO.setGoodsAmount(goodsAmount);
+        BigDecimal deliveryFee = goodsAmount.compareTo(new BigDecimal(30)) >= 0 ? BigDecimal.ZERO : new BigDecimal(3);
+        orderDTO.setDeliveryFee(deliveryFee);
+        orderDTO.setTotalAmount(goodsAmount.add(deliveryFee));
+        orderDTO.setRemark(orderMap.get("remark") == null ? null : (String) orderMap.get("remark"));
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("reply", parsed.get("reply"));
+        result.put("order", orderDTO);
+        return result;
+    }
 }
 
