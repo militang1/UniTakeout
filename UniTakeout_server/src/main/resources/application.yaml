@@ -46,5 +46,5 @@ unitakeout:
   sms:
     host: https://dfsns.market.alicloudapi.com
     path: /data/send_sms
-    appcode: 3d8473ce3ffc4e1c8930f84b80019733
+    appcode: 3d8473ce3ffc4e1c8930f84b80019733-
     template-id: CST_ptdie100

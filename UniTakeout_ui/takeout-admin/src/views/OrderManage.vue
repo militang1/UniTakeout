@@ -49,18 +49,12 @@
             </td>
             <td>{{ order.createTime }}</td>
             <td>
-              <button
-                v-if="order.status === 'pending'"
-                class="btn btn-primary btn-sm"
-                @click="updateOrderStatus(order.id, 'processing')"
-              >
+              <button v-if="order.status === 'pending'" class="btn btn-primary btn-sm"
+                @click="updateOrderStatus(order.id, 'processing')">
                 接单
               </button>
-              <button
-                v-if="order.status === 'processing'"
-                class="btn btn-primary btn-sm"
-                @click="updateOrderStatus(order.id, 'completed')"
-              >
+              <button v-if="order.status === 'processing'" class="btn btn-primary btn-sm"
+                @click="updateOrderStatus(order.id, 'completed')">
                 完成
               </button>
               <button class="btn btn-outline btn-sm" @click="viewOrderDetail(order.id)">详情</button>
@@ -71,6 +65,16 @@
           </tr>
         </tbody>
       </table>
+
+      <!-- 分页控件 -->
+      <div class="pagination-controls" v-if="total > pageSize">
+        <div class="page-info">显示 {{ Math.min((page - 1) * pageSize + 1, total) }} - {{ Math.min(page * pageSize, total) }} / {{ total }} 条</div>
+        <div class="page-actions">
+          <button class="btn btn-outline btn-sm" :disabled="page <= 1" @click="prevPage">上一页</button>
+          <span class="page-number">第 {{ page }} / {{ totalPages }} 页</span>
+          <button class="btn btn-outline btn-sm" :disabled="page >= totalPages" @click="nextPage">下一页</button>
+        </div>
+      </div>
     </div>
 
     <!-- 订单详情弹窗 -->
@@ -167,27 +171,208 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { orderApi } from '../utils/request'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { orderApi, shopApi } from '../utils/request'
 
 const orders = ref([])
 const selectedStatus = ref('')
 const showDetailModal = ref(false)
 const currentOrder = ref(null)
 
-onMounted(() => {
+// 分页状态
+const page = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
+
+// 监听筛选变化，重置页码
+watch(selectedStatus, () => {
+  page.value = 1
   loadOrders()
 })
 
+// WebSocket state
+let ws = null
+let reconnectTimer = null
+let reconnectAttempts = 0
+const maxReconnectAttempts = 6
+
+// 通知音频
+let notifyAudio = null
+function playNotificationSound() {
+  try {
+    if (!notifyAudio) {
+      // /preview.mp3 在 public 目录下，会被当作根路径资源提供
+      notifyAudio = new Audio('/preview.mp3')
+      notifyAudio.preload = 'auto'
+    }
+    // 避免叠加播放，重置到 0 后播放
+    try { notifyAudio.pause() } catch (e) { }
+    try { notifyAudio.currentTime = 0 } catch (e) { }
+    const p = notifyAudio.play()
+    if (p && typeof p.then === 'function') {
+      p.catch((err) => console.warn('播放提示音被阻止或失败：', err))
+    }
+  } catch (err) {
+    console.error('播放提示音异常：', err)
+  }
+}
+
+onMounted(async () => {
+  await loadOrders()
+  initWebSocket()
+})
+
+onUnmounted(() => {
+  if (ws) {
+    try { ws.close() } catch (e) { console.error('关闭 ws 失败', e) }
+    ws = null
+  }
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+})
+
+function buildWsUrl(sid) {
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  const host = 'localhost:3000'
+  return `${protocol}://${host}/ws/${sid}`
+}
+
+async function initWebSocket() {
+  // 获取店铺信息以确定 sid；若失败则退回通用 sid
+  let sid = 'admin'
+  try {
+    const res = await shopApi.getShopInfo()
+    if (res && res.code === 200 && res.data && res.data.id) {
+      sid = res.data.id
+    }
+  } catch (e) {
+    console.warn('获取店铺信息失败，使用默认 sid', e)
+  }
+
+  connectWs(sid)
+}
+
+function connectWs(sid) {
+  if (ws) {
+    try { ws.close() } catch (e) { console.error(e) }
+    ws = null
+  }
+
+  const url = buildWsUrl(sid)
+  try {
+    ws = new WebSocket(url)
+  } catch (e) {
+    console.error('创建 WebSocket 失败', e)
+    scheduleReconnect(sid)
+    return
+  }
+
+  ws.onopen = () => {
+    console.log('WebSocket 已连接', url)
+    reconnectAttempts = 0
+  }
+
+  ws.onmessage = (event) => {
+    const raw = event.data
+
+    // 如果服务端直接发送简短文本通知（后端示例），先处理明确的文本提示
+    if (typeof raw === 'string' && raw.includes('您有新的订单，请及时接单')) {
+      // 重新拉取订单并播放提示音，等待1s后再执行，避免由于数据库延迟导致新订单未显示
+      setTimeout(async () => {
+        await loadOrders()  // 等待 loadOrders 异步完成
+        playNotificationSound()
+      }, 1000)
+      return
+    }
+
+    // 解析消息，支持多种服务端格式：{ type: 'new_order', data: {...} } 或 { order: {...} }
+    try {
+      const msg = JSON.parse(raw)
+
+      // 优先使用明确的类型
+      if (msg.type === 'new_order' || msg.event === 'order_created') {
+        if (msg.data || msg.order) {
+          const newOrder = msg.data || msg.order
+          // 如果当前是第一页，插入并保持不超过 pageSize；否则刷新列表
+          if (page.value === 1) {
+            orders.value.unshift(newOrder)
+            if (orders.value.length > pageSize.value) orders.value.splice(pageSize.value)
+          } else {
+            loadOrders()
+          }
+        } else {
+          // 没有携带完整订单时重新拉取列表以保证数据一致
+          loadOrders()
+        }
+        // 也播放提示音以提醒管理员
+        playNotificationSound()
+      } else if (msg.type === 'order_update' || msg.event === 'order_updated') {
+        // 简单策略：刷新列表
+        loadOrders()
+      } else if (msg.order) {
+        if (page.value === 1) {
+          orders.value.unshift(msg.order)
+          if (orders.value.length > pageSize.value) orders.value.splice(pageSize.value)
+        } else {
+          loadOrders()
+        }
+        playNotificationSound()
+      } else {
+        // 兼容：如果消息看起来像是 orderId
+        if (msg.orderId) {
+          loadOrders()
+        } else {
+          console.log('未识别的 ws 消息：', msg)
+        }
+      }
+    } catch (err) {
+      // 仍然可能是纯文本或无法解析的数据
+      console.warn('无法解析 WebSocket 消息，可能是纯文本:', raw)
+    }
+  }
+
+  ws.onclose = (ev) => {
+    console.warn('WebSocket 连接已关闭', ev)
+    scheduleReconnect(sid)
+  }
+
+  ws.onerror = (err) => {
+    console.error('WebSocket 错误', err)
+    // onerror 后通常会触发 onclose
+  }
+}
+
+function scheduleReconnect(sid) {
+  if (reconnectAttempts >= maxReconnectAttempts) {
+    console.warn('达到最大重连次数，不再重连')
+    return
+  }
+  reconnectAttempts++
+  const timeout = Math.min(30000, 1000 * Math.pow(2, reconnectAttempts))
+  console.log(`第 ${reconnectAttempts} 次重连将在 ${timeout}ms 后尝试`)
+  reconnectTimer = setTimeout(() => connectWs(sid), timeout)
+}
+
 async function loadOrders() {
   try {
-    const params = {}
+    const params = {
+      page: page.value,
+      pageSize: pageSize.value
+    }
     if (selectedStatus.value) {
       params.status = selectedStatus.value
     }
     const response = await orderApi.getOrderList(params)
     if (response.code === 200 && response.data) {
       orders.value = response.data.list || []
+      // 兼容后端返回分页信息
+      total.value = response.data.total || response.data.total || (response.data.list ? response.data.list.length : 0)
+      // 如果后端返回 page/pageSize，保持一致
+      if (response.data.page) page.value = response.data.page
+      if (response.data.pageSize) pageSize.value = response.data.pageSize
     }
   } catch (error) {
     console.error('加载订单列表失败:', error)
@@ -205,6 +390,20 @@ async function viewOrderDetail(id) {
   } catch (error) {
     console.error('加载订单详情失败:', error)
     alert(error.message || '加载失败，请稍后重试')
+  }
+}
+
+function prevPage() {
+  if (page.value > 1) {
+    page.value--
+    loadOrders()
+  }
+}
+
+function nextPage() {
+  if (page.value < totalPages.value) {
+    page.value++
+    loadOrders()
   }
 }
 
@@ -323,6 +522,27 @@ function getStatusText(status) {
   margin-right: 8px;
 }
 
+/* 分页控件 - 保持简洁与现有样式一致 */
+.pagination-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+}
+.pagination-controls .page-info {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.pagination-controls .page-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.pagination-controls .page-number {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
 .modal {
   position: fixed;
   top: 0;
@@ -413,9 +633,3 @@ function getStatusText(status) {
   border-top: 1px solid var(--border-color);
 }
 </style>
-
-
-
-
-
-

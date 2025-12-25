@@ -57,7 +57,7 @@ public class WebSocketServer {
      *
      * @param message
      */
-    public void sendToAllClient(String message) {
+    public static void sendToAllClient(String message) {
         Collection<Session> sessions = sessionMap.values();
         for (Session session : sessions) {
             try {

@@ -11,6 +11,9 @@ import com.nbufe.zfr.UniTakeout_server.service.OrderService;
 import com.nbufe.zfr.UniTakeout_server.vo.PageResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.nbufe.zfr.UniTakeout_server.websocket.WebSocketServer;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -21,6 +24,8 @@ import java.util.List;
 public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final OrderItemMapper orderItemMapper;
+
+    private static final Logger logger = LoggerFactory.getLogger(OrderServiceImpl.class);
 
     public OrderServiceImpl(OrderMapper orderMapper, OrderItemMapper orderItemMapper) {
         this.orderMapper = orderMapper;
@@ -63,6 +68,15 @@ public class OrderServiceImpl implements OrderService {
         orderItemMapper.insertBatch(items);
         
         order.setItems(items);
+
+        // 推送 WebSocket 通知给商家端
+        try {
+            WebSocketServer.sendToAllClient("您有新的订单，请及时接单");
+            logger.info("已推送新订单通知，orderNo={}", orderNo);
+        } catch (Exception e) {
+            logger.error("推送新订单通知失败", e);
+        }
+
         return order;
     }
 
