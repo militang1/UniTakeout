@@ -48,3 +48,7 @@ unitakeout:
     path: /data/send_sms
     appcode: 3d8473ce3ffc4e1c8930f84b80019733-
     template-id: CST_ptdie100
+  deepseek:
+    api-key: ${DEEPSEEK_API_KEY}
+    base-url: https://api.deepseek.com
+    model: deepseek-chat

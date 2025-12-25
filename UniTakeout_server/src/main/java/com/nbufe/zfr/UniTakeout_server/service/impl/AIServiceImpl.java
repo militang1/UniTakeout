@@ -1,5 +1,6 @@
 package com.nbufe.zfr.UniTakeout_server.service.impl;
 
+import com.nbufe.zfr.UniTakeout_server.config.AIConfig;
 import com.nbufe.zfr.UniTakeout_server.dto.AIAutoOrderDTO;
 import com.nbufe.zfr.UniTakeout_server.dto.AIRecommendDTO;
 import com.nbufe.zfr.UniTakeout_server.dto.OrderCreateDTO;
@@ -9,7 +10,12 @@ import com.nbufe.zfr.UniTakeout_server.entity.Product;
 import com.nbufe.zfr.UniTakeout_server.mapper.ProductMapper;
 import com.nbufe.zfr.UniTakeout_server.service.AIService;
 import com.nbufe.zfr.UniTakeout_server.service.OrderService;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -18,10 +24,49 @@ import java.util.*;
 public class AIServiceImpl implements AIService {
     private final ProductMapper productMapper;
     private final OrderService orderService;
+    private final AIConfig config;
+    private final RestTemplate restTemplate = new RestTemplate();
 
-    public AIServiceImpl(ProductMapper productMapper, OrderService orderService) {
+    public AIServiceImpl(ProductMapper productMapper, OrderService orderService, AIConfig config) {
         this.productMapper = productMapper;
         this.orderService = orderService;
+        this.config = config;
+    }
+
+    public String chat(String userMessage) {
+        // 1. 构造请求头
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(config.getApiKey());
+
+        // 2. 构造 messages
+        List<Map<String, String>> messages = List.of(
+                Map.of("role", "system", "content", "You are a helpful assistant"),
+                Map.of("role", "user", "content", userMessage)
+        );
+
+        // 3. 构造请求体
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", config.getModel());
+        body.put("messages", messages);
+        body.put("stream", false);
+
+        HttpEntity<Map<String, Object>> request =
+                new HttpEntity<>(body, headers);
+
+        // 4. 发送请求
+        String url = config.getBaseUrl() + "/chat/completions";
+        ResponseEntity<Map> response =
+                restTemplate.postForEntity(url, request, Map.class);
+
+        // 5. 解析返回
+        List<Map<String, Object>> choices =
+                (List<Map<String, Object>>) response.getBody().get("choices");
+
+        Map<String, Object> message =
+                (Map<String, Object>) choices.get(0).get("message");
+
+        return message.get("content").toString();
     }
 
     @Override

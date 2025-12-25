@@ -6,7 +6,10 @@ import com.nbufe.zfr.UniTakeout_server.entity.Order;
 import java.util.Map;
 
 public interface AIService {
+
     Map<String, Object> recommend(AIRecommendDTO dto);
     Order autoOrder(AIAutoOrderDTO dto);
+
+    String chat(String message);
 }
 

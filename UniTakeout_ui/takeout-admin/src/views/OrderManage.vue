@@ -68,7 +68,8 @@
 
       <!-- 分页控件 -->
       <div class="pagination-controls" v-if="total > pageSize">
-        <div class="page-info">显示 {{ Math.min((page - 1) * pageSize + 1, total) }} - {{ Math.min(page * pageSize, total) }} / {{ total }} 条</div>
+        <div class="page-info">显示 {{ Math.min((page - 1) * pageSize + 1, total) }} - {{ Math.min(page * pageSize, total)
+          }} / {{ total }} 条</div>
         <div class="page-actions">
           <button class="btn btn-outline btn-sm" :disabled="page <= 1" @click="prevPage">上一页</button>
           <span class="page-number">第 {{ page }} / {{ totalPages }} 页</span>
@@ -529,15 +530,18 @@ function getStatusText(status) {
   align-items: center;
   padding: 12px 0;
 }
+
 .pagination-controls .page-info {
   color: var(--text-secondary);
   font-size: 13px;
 }
+
 .pagination-controls .page-actions {
   display: flex;
   gap: 8px;
   align-items: center;
 }
+
 .pagination-controls .page-number {
   color: var(--text-secondary);
   font-size: 13px;

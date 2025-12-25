@@ -37,5 +37,12 @@ public class AIController {
             return Result.error(e.getMessage());
         }
     }
+
+    @PostMapping("/chat")
+    public Map<String, Object> chat(@RequestBody Map<String, String> body) {
+        String message = body.get("message");
+        String reply = aiService.chat(message);
+        return Map.of("reply", reply);
+    }
 }
 
