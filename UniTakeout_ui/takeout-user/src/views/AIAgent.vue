@@ -35,9 +35,10 @@
                   <span>¥{{ item.price * item.quantity }}</span>
                 </div>
                 <div class="order-total">
-                  <span>总计：¥{{ message.order.total }}</span>
+                  <span>总计：¥{{ message.order.totalAmount }}</span>
                 </div>
-                <button class="btn btn-primary" :disabled="aiPlacing" @click="message.isSuggest ? confirmAndPlaceOrder(message) : confirmOrder(message.order)">
+                <button class="btn btn-primary" :disabled="aiPlacing"
+                  @click="message.isSuggest ? openConfirmModal(message) : confirmOrder(message.order)">
                   {{ message.isSuggest ? (aiPlacing ? '下单中...' : '一键下单') : '确认下单' }}
                 </button>
               </div>
@@ -46,7 +47,8 @@
         </div>
 
         <div class="chat-input">
-          <input v-model="inputText" :disabled="aiLoading" type="text" placeholder="告诉AI你的需求，例如：我想吃辣的" @keyup.enter="sendMessage" />
+          <input v-model="inputText" :disabled="aiLoading" type="text" placeholder="告诉AI你的需求，例如：我想吃辣的"
+            @keyup.enter="sendMessage" />
           <button class="send-btn" :disabled="aiLoading" @click="sendMessage">{{ aiLoading ? '发送中...' : '发送' }}</button>
         </div>
       </div>
@@ -60,6 +62,32 @@
           </span>
         </div>
       </div>
+
+      <!-- 确认订单模态框 -->
+      <div v-if="showConfirmModal" class="confirm-modal-overlay" @click.self="closeConfirmModal">
+        <div class="confirm-modal">
+          <h3>确认订单信息</h3>
+          <div class="user-info">
+            <p><strong>用户：</strong>{{ userStore.userInfo.name || userStore.userInfo.username || '匿名' }}</p>
+            <p><strong>电话：</strong>{{ userStore.userInfo.phone || '未填写' }}</p>
+            <p><strong>地址：</strong>{{ userStore.userInfo.address || '未设置地址' }}</p>
+          </div>
+          <div class="order-preview" v-if="confirmMessage && confirmMessage.order">
+            <h4>订单预览</h4>
+            <div v-for="item in confirmMessage.order.items" :key="item.id" class="order-item">
+              <span>{{ item.name }} x{{ item.quantity || 1 }}</span>
+              <span>¥{{ item.price * (item.quantity || 1) }}</span>
+            </div>
+            <div class="order-total"><strong>总计：¥{{ confirmMessage.order.total }}</strong></div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" @click="closeConfirmModal">取消</button>
+            <button class="btn btn-primary" :disabled="aiPlacing" @click="placeOrderConfirmed">{{ aiPlacing ? '下单中...' :
+              '确认并下单' }}</button>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </template>
@@ -78,12 +106,13 @@ const chatContainer = ref(null)
 const inputText = ref('')
 const aiLoading = ref(false)
 
+const showConfirmModal = ref(false)
+const confirmMessage = ref(null)
+
 const quickQuestions = [
-  '推荐今天的午餐',
-  '我想吃辣的',
-  '预算30元以内',
-  '帮我选个套餐',
-  '有什么新品推荐'
+  '我想吃烧烤，请帮我挑选一些菜品自动下单',
+  '帮我点一杯奶茶',
+  '帮我下单一份麻辣香锅',
 ]
 
 const messages = ref([
@@ -209,14 +238,14 @@ function confirmOrder(order) {
 const aiPlacing = ref(false)
 
 async function confirmAndPlaceOrder(message) {
-  if (!message || !message.order) return
-  if (aiPlacing.value) return
+  if (!message || !message.order) return false
+  if (aiPlacing.value) return false
   aiPlacing.value = true
   try {
     if (!userStore.isLoggedIn) {
       alert('请先登录后再下单')
       router.push('/profile')
-      return
+      return false
     }
 
     const payload = message.order
@@ -227,14 +256,42 @@ async function confirmAndPlaceOrder(message) {
       scrollToBottom()
       // 跳转到订单页查看
       router.push('/order')
+      return true
     } else {
       alert(res.message || '下单失败')
+      return false
     }
   } catch (err) {
     console.error('下单失败', err)
     alert(err.message || '下单失败，请稍后重试')
+    return false
   } finally {
     aiPlacing.value = false
+  }
+}
+
+function openConfirmModal(message) {
+  if (!message || !message.order) return
+  confirmMessage.value = message
+  // 如果未登录，引导登录
+  if (!userStore.isLoggedIn) {
+    alert('请先登录后再下单')
+    router.push('/profile')
+    return
+  }
+  showConfirmModal.value = true
+}
+
+function closeConfirmModal() {
+  showConfirmModal.value = false
+  confirmMessage.value = null
+}
+
+async function placeOrderConfirmed() {
+  if (!confirmMessage.value) return
+  const success = await confirmAndPlaceOrder(confirmMessage.value)
+  if (success) {
+    closeConfirmModal()
   }
 }
 </script>
@@ -472,5 +529,119 @@ async function confirmAndPlaceOrder(message) {
   max-width: 750px;
   margin: 0 auto;
   padding: 0 0px;
+}
+
+/* 样式优化 */
+.chat-container {
+  background: white;
+  border-radius: 14px;
+  margin: 16px;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 320px);
+  max-height: 680px;
+  box-shadow: 0 6px 18px rgba(2, 12, 27, 0.06);
+}
+
+.recommendation-card {
+  background: white;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  display: flex;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.recommendation-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.send-btn {
+  padding: 10px 20px;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.12s, transform 0.08s;
+}
+
+.send-btn:active {
+  transform: scale(0.98);
+}
+
+.send-btn:hover {
+  filter: brightness(0.95);
+}
+
+.message-content {
+  padding: 14px;
+}
+
+.message.ai .avatar {
+  font-size: 18px;
+  background: linear-gradient(90deg, #f0f4f8, #e6f2ff);
+}
+
+/* 确认模态框 */
+.confirm-modal-overlay {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.confirm-modal {
+  width: 90%;
+  max-width: 480px;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 12px 32px rgba(2, 12, 27, 0.18);
+}
+
+.confirm-modal h3 {
+  margin: 0 0 12px;
+}
+
+.confirm-modal .user-info p {
+  margin: 6px 0;
+  color: #333;
+}
+
+.confirm-modal .order-preview {
+  margin-top: 12px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.btn.btn-secondary {
+  background: #f3f4f6;
+  color: #333;
+  border-radius: 8px;
+  padding: 8px 14px;
+  border: none;
+}
+
+.btn.btn-primary {
+  background: var(--primary-color);
+  color: white;
+  border-radius: 8px;
+  padding: 8px 14px;
+  border: none;
 }
 </style>

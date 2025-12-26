@@ -12,9 +12,4 @@ public class AIConfig {
     private String apiKey;
     private String baseUrl;
     private String model;
-
-    @PostConstruct
-    public void check() {
-        System.out.println("DeepSeek apiKey = " + apiKey);
-    }
 }

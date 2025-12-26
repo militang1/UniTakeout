@@ -259,6 +259,7 @@ public class AIServiceImpl implements AIService {
         Map<String, Object> result = new HashMap<>();
         result.put("reply", parsed.get("reply"));
         result.put("order", orderDTO);
+        System.out.println("AI 输出: " + result);
         return result;
     }
 }
