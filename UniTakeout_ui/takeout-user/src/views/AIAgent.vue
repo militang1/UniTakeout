@@ -68,7 +68,7 @@
         <div class="confirm-modal">
           <h3>确认订单信息</h3>
           <div class="user-info">
-            <p><strong>用户：</strong>{{ userStore.userInfo.name || userStore.userInfo.username || '匿名' }}</p>
+            <p><strong>用户：</strong>{{ userStore.userInfo.name || userStore.userInfo.username || 'militang' }}</p>
             <p><strong>电话：</strong>{{ userStore.userInfo.phone || '未填写' }}</p>
             <p><strong>地址：</strong>{{ userStore.userInfo.address || '未设置地址' }}</p>
           </div>
@@ -78,7 +78,7 @@
               <span>{{ item.name }} x{{ item.quantity || 1 }}</span>
               <span>¥{{ item.price * (item.quantity || 1) }}</span>
             </div>
-            <div class="order-total"><strong>总计：¥{{ confirmMessage.order.total }}</strong></div>
+            <div class="order-total"><strong>总计：¥{{ confirmMessage.order.totalAmount }}</strong></div>
           </div>
           <div class="modal-actions">
             <button class="btn btn-secondary" @click="closeConfirmModal">取消</button>
