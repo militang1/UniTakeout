@@ -97,13 +97,6 @@ Mapper XML 位于：`src/main/resources/mapper/*.xml`（MyBatis SQL 映射）。
 
 ---
 
-如果需要，我可以：
-- 将 README 稍作精简或补充更多调用示例（示例请求/返回）；
-- 生成一页“部署指南”（包括 Docker/CICD 的建议）；
-- 或为关键流程补充时序图或 ER 图。
-
-✅ 已完成：项目阅读与 README 草稿准备。下一步：是否需要我将 README 进一步精简或添加示例与部署步骤？
-
 
 补充：
 
