@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Base prose styles for markdown */
+.prose {
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.prose p {
+  margin-bottom: 0.5rem;
+}
+
+.prose p:last-child {
+  margin-bottom: 0;
+}
+
+.prose strong {
+  font-weight: 600;
+  color: inherit;
+}

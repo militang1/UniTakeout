@@ -1,0 +1,193 @@
+# AIAgent 页面重构技术文档
+
+## 概述
+
+AIAgent 页面是 takeout-user 项目中的 AI 智能推荐功能页面，用户可以通过与 AI 助手对话获取美食推荐，并支持一键下单。本文档旨在为页面重构提供全面的技术指导，包括样式、路由、接口等关键信息。
+
+## 功能需求
+
+### 当前功能
+- AI 对话界面：用户输入需求，AI 返回推荐或订单建议
+- 推荐展示：显示菜品推荐卡片，包括图片、名称、店铺、价格、评分
+- 订单预览：展示 AI 建议的订单详情，包括商品列表和总价
+- 一键下单：通过确认模态框验证用户信息和订单信息后下单
+- 快速提问：提供预设问题标签供用户快速选择
+
+### 重构目标
+- 优化界面布局，提升用户体验
+- 改进状态管理，减少重复代码
+- 添加地址选择功能到确认模态框
+- 提升样式一致性和可维护性
+
+## 技术栈
+
+- **前端框架**: Vue 3 (Composition API)
+- **路由**: Vue Router 4
+- **状态管理**: Pinia
+- **HTTP 客户端**: Axios
+- **构建工具**: Vite
+- **样式**: CSS Variables, Flexbox/Grid
+
+## 路由配置
+
+```javascript
+// src/router/index.js
+{
+  path: '/ai-agent',
+  name: 'AIAgent',
+  component: AIAgent
+}
+```
+
+路由访问方式：`/ai-agent`
+
+## API 接口
+
+### AI 建议接口
+```javascript
+// src/utils/request.js - aiApi.agentSuggest
+const payload = {
+  query: string,        // 用户输入的问题
+  userId: number | null, // 用户ID（可选）
+  address: string        // 用户地址（可选）
+}
+
+const response = {
+  code: 200 | 1,
+  data: {
+    reply: string,           // AI 回复文本
+    recommendations: Array,  // 推荐商品列表
+    order: {                 // 建议订单
+      items: Array,          // 订单项
+      total: number          // 总价
+    }
+  }
+}
+```
+
+### 创建订单接口
+```javascript
+// src/utils/request.js - orderApi.createOrder
+const payload = {
+  // 订单数据结构（根据后端要求）
+}
+
+const response = {
+  code: 200 | 1,
+  data: {
+    orderNo: string,  // 订单号
+    orderId: number   // 订单ID
+  }
+}
+```
+
+## 样式指南
+
+### CSS Variables
+```css
+:root {
+  --primary-color: #ff6b35;
+  --bg-light: #f5f5f5;
+  --bg-secondary: #f8f9fa;
+  --text-light: #666;
+  --border-color: #e0e0e0;
+}
+```
+
+### 主要样式组件
+
+#### 页面布局
+- `.ai-agent`: 主容器，全屏高度，浅灰背景
+- `.header`: 渐变头部，包含标题和副标题
+- `.container`: 内容容器，最大宽度 750px，居中对齐
+
+#### 聊天界面
+- `.chat-container`: 聊天容器，白色背景，圆角，阴影
+- `.chat-messages`: 消息列表，可滚动
+- `.message`: 消息项，包含头像和内容
+- `.message-content`: 消息内容区域
+
+#### 推荐卡片
+- `.recommendation-card`: 推荐商品卡片，白色背景，圆角，悬停效果
+- `.rec-image`: 商品图片，60x60px，圆角
+- `.rec-info`: 商品信息区域
+- `.rec-price`: 价格显示，橙色主题色
+
+#### 订单摘要
+- `.order-summary`: 订单预览区域
+- `.order-item`: 订单项，显示名称和价格
+- `.order-total`: 订单总价，加粗显示
+
+#### 模态框
+- `.confirm-modal-overlay`: 模态框遮罩，半透明黑色背景
+- `.confirm-modal`: 模态框内容，白色背景，圆角，阴影
+- `.modal-actions`: 模态框按钮区域
+
+#### 输入区域
+- `.chat-input`: 输入框容器
+- `.send-btn`: 发送按钮，主题色背景，圆角
+- `.quick-questions`: 快速提问区域
+- `.question-tag`: 问题标签，可点击
+
+### 响应式设计
+- 移动端优先，最大宽度 750px
+- 使用 Flexbox 实现弹性布局
+- 图片和卡片自适应缩放
+
+## 重构建议
+
+### 组件拆分
+1. 将消息组件拆分为独立组件：`MessageItem.vue`
+2. 将推荐卡片拆分为：`RecommendationCard.vue`
+3. 将确认模态框拆分为：`OrderConfirmModal.vue`
+4. 将快速提问拆分为：`QuickQuestions.vue`
+
+### 状态管理优化
+- 使用 Pinia store 管理聊天消息状态
+- 添加消息历史持久化（localStorage）
+- 优化加载状态管理
+
+### 样式重构
+- 使用 CSS Modules 或 Scoped CSS 避免样式冲突
+- 引入设计系统，统一颜色、字体、间距
+- 添加动画效果，提升交互体验
+
+### 功能增强
+- 添加语音输入功能
+- 支持消息撤回和重新发送
+- 添加订单历史查看
+- 集成地址管理到确认模态框
+
+## 开发步骤
+
+1. **环境准备**
+   - 安装依赖：`npm install`
+   - 启动开发服务器：`npm run dev`
+
+2. **组件拆分**
+   - 创建子组件文件
+   - 提取样式到单独文件
+   - 更新父组件引用
+
+3. **样式重构**
+   - 定义设计系统变量
+   - 重写样式，使用现代 CSS 特性
+   - 添加响应式断点
+
+4. **功能优化**
+   - 重构状态管理逻辑
+   - 添加新功能（地址选择等）
+   - 优化错误处理
+
+5. **测试验证**
+   - 单元测试组件功能
+   - 端到端测试用户流程
+   - 性能优化和代码审查
+
+## 注意事项
+
+- 保持向后兼容性，确保现有功能不受影响
+- 遵循 Vue 3 Composition API 最佳实践
+- 注意内存泄漏，避免在组件卸载时清理定时器和事件监听器
+- 优化图片加载，使用懒加载和压缩
+- 确保无障碍访问，支持键盘导航和屏幕阅读器

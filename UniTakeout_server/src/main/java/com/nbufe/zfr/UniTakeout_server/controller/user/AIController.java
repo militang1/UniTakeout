@@ -5,6 +5,7 @@ import com.nbufe.zfr.UniTakeout_server.dto.AIAutoOrderDTO;
 import com.nbufe.zfr.UniTakeout_server.dto.AIRecommendDTO;
 import com.nbufe.zfr.UniTakeout_server.entity.Order;
 import com.nbufe.zfr.UniTakeout_server.service.AIService;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -57,6 +58,15 @@ public class AIController {
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }
+    }
+
+    /**
+     * POST /api/ai/agent-suggest-stream
+     * SSE 流式输出：边生成 reply 文本边推送，最后推送完整的 {reply, order}
+     */
+    @PostMapping(value = "/agent-suggest-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter agentSuggestStream(@RequestBody AIAutoOrderDTO dto) {
+        return aiService.agentSuggestStream(dto);
     }
 }
 

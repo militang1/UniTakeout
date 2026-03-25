@@ -11,7 +11,10 @@
           <div v-for="(message, index) in messages" :key="index" class="message" :class="message.type">
             <div v-if="message.type === 'ai'" class="avatar">🤖</div>
             <div class="message-content">
-              <div class="message-text">{{ message.text }}</div>
+              <div class="message-text">
+                {{ message.text }}
+                <span v-if="message.isStreaming" class="typing-cursor"></span>
+              </div>
               <div v-if="message.recommendations" class="recommendations">
                 <div v-for="rec in message.recommendations" :key="rec.id" class="recommendation-card"
                   @click="selectRecommendation(rec)">
@@ -68,7 +71,7 @@
         <div class="confirm-modal">
           <h3>确认订单信息</h3>
           <div class="user-info">
-            <p><strong>用户：</strong>{{ userStore.userInfo.name || userStore.userInfo.username || 'militang' }}</p>
+            <p><strong>用户：</strong>{{ userStore.userInfo.name || userStore.userInfo.username || '匿名' }}</p>
             <p><strong>电话：</strong>{{ userStore.userInfo.phone || '未填写' }}</p>
             <p><strong>地址：</strong>{{ userStore.userInfo.address || '未设置地址' }}</p>
           </div>
@@ -78,7 +81,7 @@
               <span>{{ item.name }} x{{ item.quantity || 1 }}</span>
               <span>¥{{ item.price * (item.quantity || 1) }}</span>
             </div>
-            <div class="order-total"><strong>总计：¥{{ confirmMessage.order.totalAmount }}</strong></div>
+            <div class="order-total"><strong>总计：¥{{ confirmMessage.order.total }}</strong></div>
           </div>
           <div class="modal-actions">
             <button class="btn btn-secondary" @click="closeConfirmModal">取消</button>
@@ -97,7 +100,8 @@ import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '../stores/cart'
 import { useUserStore } from '../stores/user'
-import { aiApi, orderApi } from '../utils/request'
+import api from '../api'
+import { orderApi } from '../utils/request'
 
 const cartStore = useCartStore()
 const router = useRouter()
@@ -132,6 +136,44 @@ function scrollToBottom() {
   })
 }
 
+/**
+ * AI 上下文管理（前端仅内存，不落库）
+ * 把最近的用户/AI对话拼成 query 发给后端，避免只靠单轮输入导致上下文丢失。
+ */
+function buildAIContextQuery() {
+  const skipAiTextRegex = /(已加入购物车|订单已创建|确认下单|下单中\.{0,3}|本次未返回订单信息|AI当前无法生成订单建议)/
+  const maxMessages = 12
+  const maxChars = 1600
+
+  const parts = []
+  let totalChars = 0
+
+  // 从后往前拼，优先保留最新信息
+  for (let i = messages.value.length - 1; i >= 0; i--) {
+    const m = messages.value[i]
+    if (!m || !m.type) continue
+
+    if (m.type === 'ai') {
+      if (!m.text) continue
+      // 点餐事件属于临时行为，不纳入对话上下文
+      if (skipAiTextRegex.test(m.text)) continue
+    } else if (m.type !== 'user') {
+      continue
+    }
+
+    const role = m.type === 'user' ? 'User' : 'AI'
+    const line = `${role}: ${m.text || ''}`
+
+    const nextTotal = totalChars + line.length
+    if (parts.length >= maxMessages || nextTotal > maxChars) break
+
+    parts.push(line)
+    totalChars = nextTotal
+  }
+
+  return parts.reverse().join('\n')
+}
+
 async function sendMessage() {
   if (!inputText.value.trim() || aiLoading.value) return
 
@@ -141,44 +183,121 @@ async function sendMessage() {
     text: inputText.value
   })
 
-  const userInput = inputText.value
   inputText.value = ''
   scrollToBottom()
 
-  // 调用后端 agent-suggest 接口
+  // 先插入占位 AI 消息，实现“流式输出”
+  const aiIndex = messages.value.length
+  messages.value.push({
+    type: 'ai',
+    text: '',
+    recommendations: null,
+    order: null,
+    isSuggest: true,
+    isStreaming: true
+  })
+
+  // 调用后端 agent-suggest-stream 接口（SSE）
   aiLoading.value = true
   try {
     const payload = {
-      query: userInput,
+      query: buildAIContextQuery(),
       userId: userStore.userInfo.id || null,
       address: userStore.userInfo.address || ''
     }
-    const res = await aiApi.agentSuggest(payload)
 
-    if (res && (res.code === 200 || res.code === 1) && res.data) {
-      const aiResponse = {
-        type: 'ai',
-        text: res.data.reply || res.data.message || 'AI 未返回文本',
-        recommendations: res.data.recommendations || null,
-        order: res.data.order || null,
-        isSuggest: true
-      }
-      messages.value.push(aiResponse)
-      scrollToBottom()
-    } else {
-      // 失败时回退为简单消息
-      const aiResponse = {
-        type: 'ai',
-        text: res.message || 'AI 服务不可用，请稍后重试',
-        recommendations: null,
-        order: null
-      }
-      messages.value.push(aiResponse)
-      scrollToBottom()
+    const token = localStorage.getItem('token')
+    const url = `${api.defaults.baseURL}/ai/agent-suggest-stream`
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(payload)
+    })
+
+    if (!res.ok || !res.body) {
+      throw new Error('AI 服务不可用，请稍后重试')
     }
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder('utf-8')
+
+    let buffer = ''
+    let scrollScheduled = false
+
+    const scheduleScroll = () => {
+      if (scrollScheduled) return
+      scrollScheduled = true
+      setTimeout(() => {
+        scrollScheduled = false
+        scrollToBottom()
+      }, 120)
+    }
+
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+
+      // SSE 事件用空行分隔（\n\n）
+      let sepIndex = buffer.indexOf('\n\n')
+      while (sepIndex !== -1) {
+        const rawEvent = buffer.slice(0, sepIndex)
+        buffer = buffer.slice(sepIndex + 2)
+
+        const lines = rawEvent.split('\n')
+        let eventName = ''
+        const dataLines = []
+
+        for (const line of lines) {
+          const l = line.trimEnd()
+          if (l.startsWith('event:')) eventName = l.slice('event:'.length).trim()
+          if (l.startsWith('data:')) dataLines.push(l.slice('data:'.length).trim())
+        }
+
+        const dataStr = dataLines.join('\n')
+        if (!eventName) eventName = 'message'
+
+        if (eventName === 'token') {
+          if (dataStr) {
+            messages.value[aiIndex].text += dataStr
+            scheduleScroll()
+          }
+        } else if (eventName === 'final') {
+          const finalResult = JSON.parse(dataStr || '{}')
+          const aiReply = finalResult.reply || finalResult.message || 'AI 未返回文本'
+          const aiOrder = finalResult.order || null
+
+          messages.value[aiIndex].text = aiOrder
+            ? aiReply
+            : `${aiReply}（本次未返回订单信息，请手动下单或补充需求）`
+          messages.value[aiIndex].order = aiOrder
+          messages.value[aiIndex].recommendations = finalResult.recommendations || null
+          messages.value[aiIndex].isStreaming = false
+          scrollToBottom()
+        } else if (eventName === 'error') {
+          messages.value[aiIndex].isStreaming = false
+          messages.value[aiIndex].text = dataStr
+            ? `调用 AI 服务失败：${dataStr}`
+            : '调用 AI 服务失败，请稍后重试'
+        }
+
+        sepIndex = buffer.indexOf('\n\n')
+      }
+    }
+
+    // 如果服务端没有发 final，兜底关闭 loading 光标
+    messages.value[aiIndex].isStreaming = false
   } catch (err) {
-    console.error('agentSuggest 调用失败', err)
-    messages.value.push({ type: 'ai', text: '调用 AI 服务失败，请稍后重试', recommendations: null, order: null })
+    console.error('agentSuggestStream 调用失败', err)
+    messages.value[aiIndex].isStreaming = false
+    messages.value[aiIndex].text = '调用 AI 服务失败，请稍后重试'
+    messages.value[aiIndex].order = null
+    messages.value[aiIndex].recommendations = null
     scrollToBottom()
   } finally {
     aiLoading.value = false
@@ -373,6 +492,27 @@ async function placeOrderConfirmed() {
   font-size: 14px;
   line-height: 1.5;
   margin-bottom: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@keyframes cursorBlink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
+
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 16px;
+  margin-left: 2px;
+  background: rgba(2, 12, 27, 0.55);
+  animation: cursorBlink 1s steps(2, start) infinite;
+  vertical-align: -2px;
 }
 
 .recommendations {
