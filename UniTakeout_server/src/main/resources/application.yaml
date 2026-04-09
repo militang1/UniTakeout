@@ -1,6 +1,10 @@
 spring:
   application:
     name: UniTakeoutServer
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
 
   # 数据库配置
   datasource:

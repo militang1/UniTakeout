@@ -307,7 +307,7 @@ async function sendMessage() {
 function selectRecommendation(rec) {
   messages.value.push({
     type: 'user',
-    text: `我想点${rec.name}`
+    text: `${rec.name}`
   })
 
   setTimeout(() => {
@@ -497,10 +497,14 @@ async function placeOrderConfirmed() {
 }
 
 @keyframes cursorBlink {
-  0%, 49% {
+
+  0%,
+  49% {
     opacity: 1;
   }
-  50%, 100% {
+
+  50%,
+  100% {
     opacity: 0;
   }
 }
